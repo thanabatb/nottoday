@@ -23,13 +23,23 @@ interface AppStateContextValue {
 const AppStateContext = createContext<AppStateContextValue | null>(null);
 
 const APP_STATE_EVENT = "nottoday:state-updated";
+let cachedStorageValue: string | null = null;
+let cachedAppState = defaultAppState;
 
 function getSnapshot() {
   if (typeof window === "undefined") {
     return defaultAppState;
   }
 
-  return restoreAppState(window.localStorage.getItem(APP_STATE_KEY));
+  const rawState = window.localStorage.getItem(APP_STATE_KEY);
+
+  if (rawState === cachedStorageValue) {
+    return cachedAppState;
+  }
+
+  cachedStorageValue = rawState;
+  cachedAppState = restoreAppState(rawState);
+  return cachedAppState;
 }
 
 function getServerSnapshot() {
@@ -41,21 +51,31 @@ function subscribe(onStoreChange: () => void) {
     return () => {};
   }
 
-  const listener = () => onStoreChange();
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key !== null && event.key !== APP_STATE_KEY) {
+      return;
+    }
 
-  window.addEventListener("storage", listener);
-  window.addEventListener(APP_STATE_EVENT, listener);
+    onStoreChange();
+  };
+  const handleAppStateUpdate = () => onStoreChange();
+
+  window.addEventListener("storage", handleStorage);
+  window.addEventListener(APP_STATE_EVENT, handleAppStateUpdate);
 
   return () => {
-    window.removeEventListener("storage", listener);
-    window.removeEventListener(APP_STATE_EVENT, listener);
+    window.removeEventListener("storage", handleStorage);
+    window.removeEventListener(APP_STATE_EVENT, handleAppStateUpdate);
   };
 }
 
 function writeState(updater: (current: AppState) => AppState) {
   const nextState = updater(getSnapshot());
+  const serializedState = JSON.stringify(nextState);
 
-  window.localStorage.setItem(APP_STATE_KEY, JSON.stringify(nextState));
+  cachedStorageValue = serializedState;
+  cachedAppState = nextState;
+  window.localStorage.setItem(APP_STATE_KEY, serializedState);
   window.dispatchEvent(new Event(APP_STATE_EVENT));
 }
 
