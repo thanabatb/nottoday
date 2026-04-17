@@ -9,9 +9,11 @@ export function HomeView() {
   const { appState, updatePreferences } = useAppState();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [soundtrack, setSoundtrack] = useState<"main" | "ending">("main");
   const landingBackdrop =
     "linear-gradient(180deg, rgba(5, 7, 15, 0.12) 0%, rgba(5, 7, 15, 0.36) 45%, rgba(5, 7, 15, 0.72) 100%), url('/illustrations/main_bg.png')";
   const soundEnabled = appState.preferences.soundEnabled;
+  const soundtrackSrc = soundtrack === "ending" ? "/audio/ending.wav" : "/audio/main.wav";
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -20,13 +22,15 @@ export function HomeView() {
       return;
     }
 
+    audio.load();
+
     if (soundEnabled) {
       audio.play().catch(() => {});
       return;
     }
 
     audio.pause();
-  }, [soundEnabled]);
+  }, [soundEnabled, soundtrackSrc]);
 
   const handleSoundToggle = () => {
     const nextSoundEnabled = !soundEnabled;
@@ -44,7 +48,7 @@ export function HomeView() {
 
   return (
     <main className="landing-screen" style={{ backgroundImage: landingBackdrop }}>
-      <audio ref={audioRef} loop preload="auto" src="/audio/main.wav" />
+      <audio ref={audioRef} loop preload="auto" src={soundtrackSrc} />
 
       <button
         aria-label={soundEnabled ? "Turn landing sound off" : "Turn landing sound on"}
@@ -65,10 +69,17 @@ export function HomeView() {
       </button>
 
       <button className="start-button" onClick={() => setResetOpen(true)} type="button">
-        Start
+        Enter Room
       </button>
 
-      <ResetFlow open={resetOpen} onClose={() => setResetOpen(false)} />
+      <ResetFlow
+        onClose={() => {
+          setSoundtrack("main");
+          setResetOpen(false);
+        }}
+        onSoundtrackChange={setSoundtrack}
+        open={resetOpen}
+      />
     </main>
   );
 }
