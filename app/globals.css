@@ -445,6 +445,30 @@ h4 {
     outline-offset: 4px;
   }
 
+  .sound-toggle-modal {
+    top: 1.25rem;
+    bottom: auto;
+    left: 1.25rem;
+    right: auto;
+    z-index: 5;
+  }
+
+  @media (max-width: 640px) {
+    .sound-toggle {
+      width: 3.5rem;
+      height: 3.5rem;
+      bottom: 1rem;
+      right: 1rem;
+    }
+
+    .sound-toggle-modal {
+      top: 1rem;
+      left: 1rem;
+      bottom: auto;
+      right: auto;
+    }
+  }
+
   .start-button {
     position: relative;
     border: 1px solid rgba(255, 255, 255, 0.22);

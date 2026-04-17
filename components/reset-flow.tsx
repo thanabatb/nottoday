@@ -68,14 +68,16 @@ function MoodPicker({
 function SoundToggleButton({
   soundEnabled,
   onToggle,
+  className = "",
 }: {
   soundEnabled: boolean;
   onToggle: () => void;
+  className?: string;
 }) {
   return (
     <button
       aria-label={soundEnabled ? "Turn landing sound off" : "Turn landing sound on"}
-      className="sound-toggle"
+      className={`sound-toggle ${className}`.trim()}
       data-enabled={soundEnabled}
       onClick={onToggle}
       type="button"
@@ -139,6 +141,7 @@ export function ResetFlow({
   const [smashEffects, setSmashEffects] = useState<SmashEffect[]>([]);
   const [hitCount, setHitCount] = useState(0);
   const [completedSession, setCompletedSession] = useState<EmotionSession | null>(null);
+  const [usesTouchInput, setUsesTouchInput] = useState(false);
   const soundEnabled = appState.preferences.soundEnabled;
   const targetHits = moodTargetHits[draft.moodBefore];
   const releasedPercent = Math.min(100, Math.round((hitCount / targetHits) * 100));
@@ -201,6 +204,24 @@ export function ResetFlow({
     onSoundtrackChange(stepIndex >= 2 ? "ending" : "main");
   }, [onSoundtrackChange, open, stepIndex]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(pointer: coarse)");
+    const updateInputMode = () => {
+      setUsesTouchInput(mediaQuery.matches || window.navigator.maxTouchPoints > 0);
+    };
+
+    updateInputMode();
+    mediaQuery.addEventListener("change", updateInputMode);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateInputMode);
+    };
+  }, []);
+
   if (!open) {
     return null;
   }
@@ -210,14 +231,14 @@ export function ResetFlow({
       {stepIndex === 0 ? (
         <motion.div
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-50 bg-slate-950/72 px-4 py-6 backdrop-blur-md"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/72 px-4 py-6 backdrop-blur-md"
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
         >
-          <div className="mx-auto flex min-h-full max-w-4xl items-center justify-center">
+          <div className="mx-auto flex min-h-full max-w-4xl items-start justify-center py-12 sm:items-center sm:py-0">
             <motion.div
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="surface relative w-full overflow-hidden"
+              className="surface relative max-h-[calc(100vh-3rem)] w-full overflow-x-hidden overflow-y-auto sm:max-h-none"
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               initial={{ opacity: 0, y: 24, scale: 0.98 }}
               transition={transition}
@@ -226,7 +247,7 @@ export function ResetFlow({
               <button className="flow-close absolute right-5 top-5" onClick={closeAndReset} type="button">
                 <X className="size-4" />
               </button>
-              <SoundToggleButton onToggle={handleSoundToggle} soundEnabled={soundEnabled} />
+              <SoundToggleButton className="sound-toggle-modal" onToggle={handleSoundToggle} soundEnabled={soundEnabled} />
 
               <div className="border-b border-white/8 px-6 py-5 sm:px-8">
                 <p className="eyebrow mb-2">Setup Stage</p>
@@ -284,7 +305,7 @@ export function ResetFlow({
           <div className="relative mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-8">
           <SoundToggleButton onToggle={handleSoundToggle} soundEnabled={soundEnabled} />
           {stepIndex === 1 ? (
-              <div className="relative min-h-[86vh]">
+              <div className="relative min-h-[calc(100vh-3rem)] sm:min-h-[86vh]">
                 <button
                   className="absolute left-0 top-0 z-10 rounded-full border border-white/12 bg-black/28 px-5 py-3 text-sm font-medium text-white/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-md transition hover:border-white/22 hover:bg-black/36"
                   onClick={closeAndReset}
@@ -293,106 +314,114 @@ export function ResetFlow({
                   Exit
                 </button>
 
-                <div className="absolute left-0 top-1/2 z-10 w-40 -translate-y-1/2 rounded-[28px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-md sm:w-48 sm:p-5">
-                  <p className="text-[0.68rem] uppercase tracking-[0.28em] text-white/52">Release Status</p>
-                  <p className="mt-2 text-sm text-white/62">{getMoodById(draft.moodBefore).label} mood</p>
-                  <div className="mt-5 flex items-end gap-4">
-                    <div className="relative h-56 w-5 overflow-hidden rounded-full bg-white/10 sm:h-64">
-                      <motion.div
-                        animate={{ height: `${angerLevel}%` }}
-                        className="absolute inset-x-0 bottom-0 rounded-full bg-[linear-gradient(180deg,#ffb26b_0%,#ff5b4d_100%)]"
-                        transition={{ duration: 0.18, ease: "easeOut" }}
-                      />
+                <div className="flex min-h-[calc(100vh-3rem)] flex-col gap-5 pb-24 pt-16 sm:block sm:min-h-[86vh] sm:pb-0 sm:pt-0">
+                  <div className="mx-auto w-full max-w-sm rounded-[28px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-md sm:absolute sm:left-0 sm:top-1/2 sm:mx-0 sm:w-40 sm:max-w-none sm:-translate-y-1/2 sm:p-4 md:w-44 lg:w-48 lg:p-5">
+                    <p className="text-[0.68rem] uppercase tracking-[0.28em] text-white/52">Release Status</p>
+                    <p className="mt-2 text-sm text-white/62">{getMoodById(draft.moodBefore).label} mood</p>
+                    <div className="mt-5 flex items-end gap-4">
+                      <div className="relative h-40 w-5 overflow-hidden rounded-full bg-white/10 sm:h-56 md:h-64">
+                        <motion.div
+                          animate={{ height: `${angerLevel}%` }}
+                          className="absolute inset-x-0 bottom-0 rounded-full bg-[linear-gradient(180deg,#ffb26b_0%,#ff5b4d_100%)]"
+                          transition={{ duration: 0.18, ease: "easeOut" }}
+                        />
+                      </div>
+                      <div className="pb-1">
+                        <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/45">Anger Level</p>
+                        <p className="mt-2 text-3xl font-semibold text-white">{angerLevel}%</p>
+                        <p className="mt-1 text-sm text-white/56">{targetHits} hits to empty</p>
+                      </div>
                     </div>
-                    <div className="pb-1">
-                      <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/45">Anger Level</p>
-                      <p className="mt-2 text-3xl font-semibold text-white">{angerLevel}%</p>
-                      <p className="mt-1 text-sm text-white/56">{targetHits} hits to empty</p>
+                    <div className="mt-5 grid gap-3 sm:block sm:space-y-3">
+                      <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
+                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Released</p>
+                        <p className="mt-1 text-2xl font-semibold text-white">{100 - angerLevel}%</p>
+                      </div>
+                      <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
+                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Hits</p>
+                        <p className="mt-1 text-2xl font-semibold text-white">{hitCount}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-5 space-y-3">
-                    <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
-                      <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Released</p>
-                      <p className="mt-1 text-2xl font-semibold text-white">{100 - angerLevel}%</p>
-                    </div>
-                    <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
-                      <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Hits</p>
-                      <p className="mt-1 text-2xl font-semibold text-white">{hitCount}</p>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="absolute left-1/2 top-1/2 w-[22rem] -translate-x-1/2 -translate-y-1/2 sm:w-[28rem]">
-                  <AnimatePresence>
-                    {smashEffects.map((effect) => (
-                      <motion.div
-                        key={effect.id}
-                        animate={{ opacity: [0, 1, 0], scale: [0.72, 1, 1.08], y: [12, 0, -8] }}
-                        className="pointer-events-none absolute z-10"
-                        exit={{ opacity: 0, scale: 1.12 }}
-                        initial={{ opacity: 0, scale: 0.72, y: 12 }}
-                        style={{
-                          left: `${effect.left}%`,
-                          top: `${effect.top}%`,
-                          rotate: `${effect.rotation}deg`,
-                          width: `${effect.size}%`,
+                  <div className="mx-auto w-full max-w-[18rem] sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-none sm:w-[20rem] sm:-translate-x-1/2 sm:-translate-y-1/2 md:w-[24rem] lg:w-[28rem]">
+                    <p className="mb-4 text-center text-[0.68rem] uppercase tracking-[0.26em] text-white/60">
+                      {usesTouchInput ? "Tap" : "Click"} the pillow to release pressure
+                    </p>
+                    <div className="relative">
+                      <AnimatePresence>
+                        {smashEffects.map((effect) => (
+                          <motion.div
+                            key={effect.id}
+                            animate={{ opacity: [0, 1, 0], scale: [0.72, 1, 1.08], y: [12, 0, -8] }}
+                            className="pointer-events-none absolute z-10"
+                            exit={{ opacity: 0, scale: 1.12 }}
+                            initial={{ opacity: 0, scale: 0.72, y: 12 }}
+                            style={{
+                              left: `${effect.left}%`,
+                              top: `${effect.top}%`,
+                              rotate: `${effect.rotation}deg`,
+                              width: `${effect.size}%`,
+                            }}
+                            transition={{ duration: 0.32, ease: "easeOut" }}
+                          >
+                            <Image
+                              alt=""
+                              aria-hidden="true"
+                              className="h-auto w-full"
+                              height={180}
+                              src="/images/smash_effect.png"
+                              width={180}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+
+                      <button
+                        className="relative block w-full touch-manipulation select-none transition hover:scale-[1.02]"
+                        onBlur={handlePillowPressEnd}
+                        onKeyDown={(event) => {
+                          if ((event.key === " " || event.key === "Enter") && !event.repeat) {
+                            event.preventDefault();
+                            handlePillowPressStart();
+                          }
                         }}
-                        transition={{ duration: 0.32, ease: "easeOut" }}
+                        onKeyUp={(event) => {
+                          if (event.key === " " || event.key === "Enter") {
+                            event.preventDefault();
+                            handlePillowPressEnd();
+                          }
+                        }}
+                        onMouseDown={handlePillowPressStart}
+                        onMouseLeave={handlePillowPressEnd}
+                        onMouseUp={handlePillowPressEnd}
+                        onTouchCancel={handlePillowPressEnd}
+                        onTouchEnd={handlePillowPressEnd}
+                        onTouchStart={handlePillowPressStart}
+                        type="button"
                       >
                         <Image
-                          alt=""
-                          aria-hidden="true"
-                          className="h-auto w-full"
-                          height={180}
-                          src="/images/smash_effect.png"
-                          width={180}
+                          alt="Release pillow"
+                          className="h-auto w-full drop-shadow-[0_24px_60px_rgba(0,0,0,0.35)]"
+                          draggable={false}
+                          height={420}
+                          priority
+                          src={pillowBroken ? "/images/pillow_break.png" : "/images/pillow_normal.png"}
+                          width={520}
                         />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                      </button>
+                    </div>
+                  </div>
 
-                  <button
-                    className="relative block w-full transition hover:scale-[1.02]"
-                    onBlur={handlePillowPressEnd}
-                    onKeyDown={(event) => {
-                      if ((event.key === " " || event.key === "Enter") && !event.repeat) {
-                        event.preventDefault();
-                        handlePillowPressStart();
-                      }
-                    }}
-                    onKeyUp={(event) => {
-                      if (event.key === " " || event.key === "Enter") {
-                        event.preventDefault();
-                        handlePillowPressEnd();
-                      }
-                    }}
-                    onMouseDown={handlePillowPressStart}
-                    onMouseLeave={handlePillowPressEnd}
-                    onMouseUp={handlePillowPressEnd}
-                    onTouchCancel={handlePillowPressEnd}
-                    onTouchEnd={handlePillowPressEnd}
-                    onTouchStart={handlePillowPressStart}
-                    type="button"
-                  >
-                    <Image
-                      alt="Release pillow"
-                      className="h-auto w-full drop-shadow-[0_24px_60px_rgba(0,0,0,0.35)]"
-                      height={420}
-                      priority
-                      src={pillowBroken ? "/images/pillow_break.png" : "/images/pillow_normal.png"}
-                      width={520}
-                    />
-                  </button>
-                </div>
-
-                <div className="absolute bottom-0 left-1/2 z-10 -translate-x-1/2">
-                  <button
-                    className="start-button start-button-soft"
-                    onClick={() => setStepIndex(2)}
-                    type="button"
-                  >
-                    I&apos;m good now
-                  </button>
+                  <div className="mx-auto mt-auto w-full max-w-xs sm:absolute sm:bottom-0 sm:left-1/2 sm:w-auto sm:max-w-none sm:-translate-x-1/2">
+                    <button
+                      className="start-button start-button-soft w-full sm:w-auto"
+                      onClick={() => setStepIndex(2)}
+                      type="button"
+                    >
+                      I&apos;m good now
+                    </button>
+                  </div>
                 </div>
               </div>
           ) : null}
