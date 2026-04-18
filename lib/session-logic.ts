@@ -21,7 +21,7 @@ export const defaultAppState: AppState = {
   preferences: {
     locale: "th",
     displayName: "",
-    soundEnabled: false,
+    soundEnabled: true,
     scene: "storm",
   },
 };
