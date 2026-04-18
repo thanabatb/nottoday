@@ -445,12 +445,49 @@ h4 {
     outline-offset: 4px;
   }
 
+  .locale-toggle {
+    position: absolute;
+    top: 1.5rem;
+    left: 1.5rem;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    padding: 0.85rem 1rem;
+    background: rgba(7, 10, 19, 0.48);
+    color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease;
+  }
+
+  .locale-toggle:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(10, 14, 24, 0.62);
+  }
+
+  .locale-toggle:focus-visible {
+    outline: 3px solid rgba(255, 245, 196, 0.95);
+    outline-offset: 4px;
+  }
+
   .sound-toggle-modal {
     top: 1.25rem;
     bottom: auto;
     left: 1.25rem;
     right: auto;
     z-index: 5;
+  }
+
+  .locale-toggle-modal {
+    top: 1.25rem;
+    left: 5.75rem;
   }
 
   @media (max-width: 640px) {
@@ -466,6 +503,18 @@ h4 {
       left: 1rem;
       bottom: auto;
       right: auto;
+    }
+
+    .locale-toggle {
+      top: 1rem;
+      left: 1rem;
+      padding: 0.75rem 0.9rem;
+      font-size: 0.8rem;
+    }
+
+    .locale-toggle-modal {
+      top: 1rem;
+      left: 5rem;
     }
   }
 

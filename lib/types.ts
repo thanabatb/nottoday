@@ -4,6 +4,7 @@ export type SessionType = "quick" | "full";
 export type NeedId = "space" | "clarity" | "support" | "rest" | "movement";
 export type ControlId = "response" | "boundary" | "timing" | "expectation";
 export type SceneId = "storm" | "sunrise";
+export type Locale = "en" | "th";
 
 export interface MoodOption {
   id: MoodId;
@@ -58,6 +59,7 @@ export interface EmotionSession {
 }
 
 export interface Preferences {
+  locale: Locale;
   soundEnabled: boolean;
   scene: SceneId;
 }

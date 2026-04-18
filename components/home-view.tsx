@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { ResetFlow } from "@/components/reset-flow";
+import { getCopy } from "@/lib/i18n";
 
 export function HomeView() {
   const { appState, updatePreferences } = useAppState();
@@ -12,8 +14,10 @@ export function HomeView() {
   const [soundtrack, setSoundtrack] = useState<"main" | "ending">("main");
   const landingBackdrop =
     "linear-gradient(180deg, rgba(5, 7, 15, 0.12) 0%, rgba(5, 7, 15, 0.36) 45%, rgba(5, 7, 15, 0.72) 100%), url('/illustrations/main_bg.png')";
+  const locale = appState.preferences.locale;
   const soundEnabled = appState.preferences.soundEnabled;
   const soundtrackSrc = soundtrack === "ending" ? "/audio/ending.wav" : "/audio/main.wav";
+  const copy = getCopy(locale);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -46,12 +50,20 @@ export function HomeView() {
     }
   };
 
+  const handleLocaleToggle = () => {
+    updatePreferences({
+      locale: locale === "en" ? "th" : "en",
+    });
+  };
+
   return (
     <main className="landing-screen" style={{ backgroundImage: landingBackdrop }}>
       <audio ref={audioRef} loop preload="auto" src={soundtrackSrc} />
 
+      <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
+
       <button
-        aria-label={soundEnabled ? "Turn landing sound off" : "Turn landing sound on"}
+        aria-label={soundEnabled ? copy.common.soundOff : copy.common.soundOn}
         className="sound-toggle"
         data-enabled={soundEnabled}
         onClick={handleSoundToggle}
@@ -65,11 +77,11 @@ export function HomeView() {
           src="/illustrations/volume-high.svg"
           width={24}
         />
-        <span className="sr-only">{soundEnabled ? "Sound On" : "Sound Off"}</span>
+        <span className="sr-only">{soundEnabled ? copy.common.soundOn : copy.common.soundOff}</span>
       </button>
 
       <button className="start-button" onClick={() => setResetOpen(true)} type="button">
-        Enter Room
+        {copy.home.enterRoom}
       </button>
 
       <ResetFlow

@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { ArrowLeft, BarChart3, FlameKindling, Trophy } from "lucide-react";
 import { useAppState } from "@/components/app-state-provider";
-import { getMoodById, moodOptions } from "@/lib/session-data";
-import { formatLongDate, formatMetric } from "@/lib/session-logic";
+import { LocaleToggle } from "@/components/locale-toggle";
+import { getCopy, getIntlLocale, getWeekdayLabels } from "@/lib/i18n";
+import { getMoodById, getMoodOptions } from "@/lib/session-data";
+import { formatLongDate, formatMetric, resolveSuggestion } from "@/lib/session-logic";
 import type { DaySummary } from "@/lib/types";
 
-const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
-
-function formatWeekLabel(weekStart: string) {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${weekStart}T12:00:00`));
+function formatWeekLabel(weekStart: string, locale: "en" | "th") {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), { month: "short", day: "numeric" }).format(new Date(`${weekStart}T12:00:00`));
 }
 
-function getHeatmapCellStyle(day: DaySummary) {
+function getHeatmapCellStyle(day: DaySummary, locale: "en" | "th") {
+  const moodOptions = getMoodOptions(locale);
+
   if (day.completedSessions === 0) {
     return {
       background: "rgba(255, 255, 255, 0.05)",
@@ -35,18 +37,20 @@ function getHeatmapCellStyle(day: DaySummary) {
   };
 }
 
-function buildDayTitle(day: DaySummary) {
-  const formattedDay = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(
+function buildDayTitle(day: DaySummary, locale: "en" | "th") {
+  const formattedDay = new Intl.DateTimeFormat(getIntlLocale(locale), { month: "short", day: "numeric" }).format(
     new Date(`${day.day}T12:00:00`),
   );
 
   if (day.completedSessions === 0) {
-    return `${formattedDay}: no sessions`;
+    return locale === "th" ? `${formattedDay}: ไม่มีเซสชัน` : `${formattedDay}: no sessions`;
   }
 
   const moodValue = Math.max(1, Math.min(5, Math.round(day.averageMood || day.highestMood)));
-  const mood = moodOptions[moodValue - 1];
-  return `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
+  const mood = getMoodOptions(locale)[moodValue - 1];
+  return locale === "th"
+    ? `${formattedDay}: ${day.completedSessions} เซสชัน, อารมณ์โทน${mood.label}`
+    : `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
 }
 
 function MetricCard({
@@ -68,45 +72,57 @@ function MetricCard({
 }
 
 export function StatsView() {
-  const { stats } = useAppState();
+  const { appState, stats, updatePreferences } = useAppState();
+  const locale = appState.preferences.locale;
+  const copy = getCopy(locale);
+  const moodOptions = getMoodOptions(locale);
+  const weekdayLabels = getWeekdayLabels(locale, "compact");
   const strongestDay = [...stats.weeklyTrend].sort((left, right) => right.averageMood - left.averageMood)[0];
+  const handleLocaleToggle = () => {
+    updatePreferences({
+      locale: locale === "en" ? "th" : "en",
+    });
+  };
 
   return (
     <main className="app-shell">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="eyebrow mb-3">Progress Tracking</p>
-          <h1 className="text-4xl sm:text-5xl">Awareness, recovery, and calm-day signals.</h1>
+          <p className="eyebrow mb-3">{copy.stats.progressTracking}</p>
+          <h1 className="text-4xl sm:text-5xl">{copy.stats.title}</h1>
         </div>
 
-        <Link
-          className="surface inline-flex items-center gap-2 px-4 py-3 text-sm font-medium transition hover:border-white/20"
-          href="/"
-        >
-          <ArrowLeft className="size-4" />
-          Back home
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <LocaleToggle className="static" locale={locale} onToggle={handleLocaleToggle} />
+          <Link
+            className="surface inline-flex items-center gap-2 px-4 py-3 text-sm font-medium transition hover:border-white/20"
+            href="/"
+          >
+            <ArrowLeft className="size-4" />
+            {copy.stats.backHome}
+          </Link>
+        </div>
       </div>
 
       <section className="grid gap-4 lg:grid-cols-4">
         <MetricCard
-          detail="Primary streak for the MVP. It rewards noticing your state."
-          label="Awareness streak"
+          detail={copy.stats.awarenessStreakDetail}
+          label={copy.stats.awarenessStreak}
           value={`${stats.awarenessStreak}d`}
         />
         <MetricCard
-          detail="Secondary signal for days where the temperature stayed low."
-          label="Calm days"
+          detail={copy.stats.calmDaysDetail}
+          label={copy.stats.calmDays}
           value={`${stats.calmDays}`}
         />
         <MetricCard
-          detail="Average drop from before to after on full reset sessions."
-          label="Recovery score"
+          detail={copy.stats.recoveryScoreDetail}
+          label={copy.stats.recoveryScore}
           value={stats.fullSessions > 0 ? `${formatMetric(stats.averageRecovery)}` : "0.0"}
         />
         <MetricCard
-          detail="All quick check-ins and full sessions combined."
-          label="Total sessions"
+          detail={copy.stats.totalSessionsDetail}
+          label={copy.stats.totalSessions}
           value={`${stats.totalSessions}`}
         />
       </section>
@@ -115,8 +131,8 @@ export function StatsView() {
         <section className="surface p-6 sm:p-8">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="eyebrow mb-3">Weekly heatmap</p>
-              <h2 className="text-3xl">Emotion streaks across the last 12 weeks.</h2>
+              <p className="eyebrow mb-3">{copy.stats.weeklyHeatmap}</p>
+              <h2 className="text-3xl">{copy.stats.weeklyHeatmapTitle}</h2>
             </div>
             <BarChart3 className="size-6 text-white/45" />
           </div>
@@ -137,15 +153,15 @@ export function StatsView() {
               {stats.heatmapWeeks.map((week, index) => (
                 <div key={week.weekStart} className="flex flex-col items-center gap-2">
                   <div className="h-5 text-center text-[0.62rem] uppercase tracking-[0.18em] text-white/38">
-                    {index % 2 === 0 ? formatWeekLabel(week.weekStart) : ""}
+                    {index % 2 === 0 ? formatWeekLabel(week.weekStart, locale) : ""}
                   </div>
 
                   {week.days.map((day) => (
                     <div
                       key={day.day}
                       className="h-5 w-5 rounded-[6px] border transition-transform hover:scale-110 sm:h-6 sm:w-6"
-                      style={getHeatmapCellStyle(day)}
-                      title={buildDayTitle(day)}
+                      style={getHeatmapCellStyle(day, locale)}
+                      title={buildDayTitle(day, locale)}
                     />
                   ))}
                 </div>
@@ -154,16 +170,16 @@ export function StatsView() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3 text-sm leading-6 text-white/64">
-            <span>Average mood: {stats.totalSessions > 0 ? formatMetric(stats.averageMood) : "0.0"}/5</span>
-            <span>Longest streak: {stats.longestAwarenessStreak} days</span>
-            <span>Current streak: {stats.awarenessStreak} day{stats.awarenessStreak === 1 ? "" : "s"}</span>
+            <span>{copy.stats.averageMood}: {stats.totalSessions > 0 ? formatMetric(stats.averageMood) : "0.0"}/5</span>
+            <span>{copy.stats.longestStreak}: {stats.longestAwarenessStreak} {locale === "th" ? "วัน" : "days"}</span>
+            <span>{copy.stats.currentStreak}: {stats.awarenessStreak} {locale === "th" ? "วัน" : stats.awarenessStreak === 1 ? "day" : "days"}</span>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
             {moodOptions.map((mood) => (
               <div
                 key={mood.id}
-                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-[0.16em] text-white/56"
+                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-xs tracking-[0.16em] text-white/56"
               >
                 <span
                   className="h-3 w-3 rounded-[4px] border"
@@ -178,40 +194,40 @@ export function StatsView() {
         <section className="surface p-6 sm:p-8">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="eyebrow mb-3">Highlights</p>
-              <h2 className="text-3xl">The current shape of your pattern.</h2>
+              <p className="eyebrow mb-3">{copy.stats.highlights}</p>
+              <h2 className="text-3xl">{copy.stats.highlightsTitle}</h2>
             </div>
             <FlameKindling className="size-6 text-white/45" />
           </div>
 
           <div className="space-y-4">
             <div className="surface-soft p-4">
-              <p className="text-sm text-white/55">Most-used ritual</p>
+              <p className="text-sm text-white/55">{copy.stats.mostUsedRitual}</p>
               <p className="mt-2 text-xl font-semibold text-white/92">
-                {stats.mostUsedTool ?? "No full ritual yet"}
+                {stats.mostUsedTool ?? copy.stats.noFullRitual}
               </p>
               <p className="mt-2 text-sm leading-6 text-white/58">
-                Most-used method: {stats.mostUsedMethod ?? "No method data yet"}
+                {locale === "th" ? "รูปแบบที่ใช้บ่อย:" : "Most-used method:"} {stats.mostUsedMethod ?? copy.stats.noMethodData}
               </p>
             </div>
 
             <div className="surface-soft p-4">
-              <p className="text-sm text-white/55">Highest recent day</p>
+              <p className="text-sm text-white/55">{copy.stats.highestRecentDay}</p>
               <p className="mt-2 text-xl font-semibold text-white/92">
-                {strongestDay?.completedSessions ? `${strongestDay.day}` : "No logged spikes this week"}
+                {strongestDay?.completedSessions ? `${strongestDay.day}` : copy.stats.noLoggedSpikes}
               </p>
               <p className="mt-2 text-sm leading-6 text-white/58">
                 {strongestDay?.completedSessions
-                  ? `Average mood ${formatMetric(strongestDay.averageMood)}/5`
-                  : "Once sessions are logged, the weekly profile fills in automatically."}
+                  ? `${copy.stats.averageMood} ${formatMetric(strongestDay.averageMood)}/5`
+                  : copy.stats.weeklyProfileHint}
               </p>
             </div>
 
             <div className="surface-soft p-4">
-              <p className="text-sm text-white/55">Badges unlocked</p>
+              <p className="text-sm text-white/55">{copy.stats.badgesUnlocked}</p>
               <p className="mt-2 text-xl font-semibold text-white/92">{stats.unlockedBadges.length}</p>
               <p className="mt-2 text-sm leading-6 text-white/58">
-                Milestones reward consistency, reflection, and emotional recovery instead of intensity.
+                {copy.stats.badgesUnlockedDetail}
               </p>
             </div>
           </div>
@@ -222,8 +238,8 @@ export function StatsView() {
         <div className="surface p-6 sm:p-8">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="eyebrow mb-3">Milestones</p>
-              <h2 className="text-3xl">Warm, low-pressure badges.</h2>
+              <p className="eyebrow mb-3">{copy.stats.milestones}</p>
+              <h2 className="text-3xl">{copy.stats.milestonesTitle}</h2>
             </div>
             <Trophy className="size-6 text-white/45" />
           </div>
@@ -238,7 +254,7 @@ export function StatsView() {
               ))
             ) : (
               <div className="surface-soft p-4 text-sm leading-7 text-white/58 md:col-span-2">
-                No badges yet. The first one unlocks after a completed full reset.
+                {copy.stats.noBadges}
               </div>
             )}
           </div>
@@ -246,23 +262,24 @@ export function StatsView() {
 
         <div className="surface p-6 sm:p-8">
           <div className="mb-6">
-            <p className="eyebrow mb-3">Recent sessions</p>
-            <h2 className="text-3xl">A short history of your pauses.</h2>
+            <p className="eyebrow mb-3">{copy.stats.recentSessions}</p>
+            <h2 className="text-3xl">{copy.stats.recentSessionsTitle}</h2>
           </div>
 
           <div className="space-y-4">
             {stats.recentSessions.length > 0 ? (
               stats.recentSessions.map((session) => {
-                const before = getMoodById(session.moodBefore);
-                const after = getMoodById(session.moodAfter);
+                const before = getMoodById(session.moodBefore, locale);
+                const after = getMoodById(session.moodAfter, locale);
+                const suggestion = resolveSuggestion(session.suggestion, locale);
 
                 return (
                   <div key={session.id} className="surface-soft p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-sm text-white/55">{formatLongDate(session.createdAt)}</p>
+                        <p className="text-sm text-white/55">{formatLongDate(session.createdAt, locale)}</p>
                         <p className="mt-2 text-lg font-semibold text-white/92">
-                          {session.sessionType === "full" ? "Full reset session" : "Quick check-in"}
+                          {session.sessionType === "full" ? copy.stats.fullResetSession : copy.stats.quickCheckIn}
                         </p>
                       </div>
                       <span className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.22em] text-white/45">
@@ -274,15 +291,15 @@ export function StatsView() {
                       <span className="text-white/35">→</span>
                       <span style={{ color: after.accent }}>{after.label}</span>
                     </div>
-                    {session.suggestion ? (
-                      <p className="mt-3 text-sm leading-6 text-white/58">{session.suggestion.title}</p>
+                    {suggestion ? (
+                      <p className="mt-3 text-sm leading-6 text-white/58">{suggestion.title}</p>
                     ) : null}
                   </div>
                 );
               })
             ) : (
               <div className="surface-soft p-4 text-sm leading-7 text-white/58">
-                The session history fills in after the first check-in.
+                {copy.stats.noSessions}
               </div>
             )}
           </div>

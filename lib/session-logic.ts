@@ -1,4 +1,5 @@
-import { controlOptions, getMethodById, getMoodById, getToolById, moodOptions } from "@/lib/session-data";
+import { getControlOptions, getMethodById, getMoodById, getMoodOptions, getToolById } from "@/lib/session-data";
+import { getIntlLocale } from "@/lib/i18n";
 import type {
   AppState,
   Badge,
@@ -7,8 +8,8 @@ import type {
   EmotionSession,
   FullSessionInput,
   HeatmapWeek,
+  Locale,
   MoodId,
-  NeedId,
   Suggestion,
 } from "@/lib/types";
 
@@ -17,6 +18,7 @@ export const APP_STATE_KEY = "nottoday-state-v1";
 export const defaultAppState: AppState = {
   sessions: [],
   preferences: {
+    locale: "th",
     soundEnabled: false,
     scene: "storm",
   },
@@ -38,6 +40,144 @@ function buildId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const suggestionCatalog: Record<string, Record<Locale, Omit<Suggestion, "id">>> = {
+  space: {
+    en: {
+      title: "Put five minutes between you and the trigger.",
+      description: "Step away, mute notifications, or postpone the reply until your body settles.",
+      actionLabel: "Take a short break",
+    },
+    th: {
+      title: "เว้นระยะห้าระหว่างคุณกับสิ่งกระตุ้นก่อน",
+      description: "ถอยออกมา ปิดการแจ้งเตือน หรือเลื่อนการตอบออกไปจนกว่าร่างกายจะนิ่งขึ้น",
+      actionLabel: "พักสั้น ๆ",
+    },
+  },
+  clarity: {
+    en: {
+      title: "Write the real issue in one sentence.",
+      description: "Name what happened, what it meant to you, and what you need next.",
+      actionLabel: "Name the issue",
+    },
+    th: {
+      title: "เขียนปัญหาที่แท้จริงออกมาเป็นหนึ่งประโยค",
+      description: "บอกให้ชัดว่าเกิดอะไรขึ้น มันมีความหมายต่อคุณอย่างไร และคุณต้องการอะไรต่อจากนี้",
+      actionLabel: "ตั้งชื่อปัญหา",
+    },
+  },
+  support: {
+    en: {
+      title: "Let someone steady the frame with you.",
+      description: "Send one concise message asking for perspective, backup, or just a calm check-in.",
+      actionLabel: "Reach out",
+    },
+    th: {
+      title: "ให้ใครสักคนช่วยพยุงกรอบความคิดนี้ไปกับคุณ",
+      description: "ส่งข้อความสั้น ๆ เพื่อขอมุมมอง ความช่วยเหลือ หรือแค่การเช็กอินอย่างสงบ",
+      actionLabel: "ติดต่อใครสักคน",
+    },
+  },
+  rest: {
+    en: {
+      title: "Your system wants recovery, not another round.",
+      description: "Water, a snack, and ten quiet minutes will help more than pushing through.",
+      actionLabel: "Recover first",
+    },
+    th: {
+      title: "ระบบของคุณต้องการการฟื้นตัว ไม่ใช่การฝืนต่ออีกยก",
+      description: "น้ำ ของว่าง และเวลาสงบสักสิบนาทีจะช่วยมากกว่าการฝืนไปต่อ",
+      actionLabel: "ฟื้นตัวก่อน",
+    },
+  },
+  movement: {
+    en: {
+      title: "Move before you message.",
+      description: "A short walk or a minute of pacing can drain the leftover charge from your body.",
+      actionLabel: "Move for a minute",
+    },
+    th: {
+      title: "ขยับร่างกายก่อนส่งข้อความ",
+      description: "เดินสั้น ๆ หรือเดินวนสักนิด จะช่วยปล่อยประจุที่ค้างอยู่ในร่างกายออกมา",
+      actionLabel: "ขยับหนึ่งนาที",
+    },
+  },
+  "high-intensity": {
+    en: {
+      title: "Do not answer while the temperature is still high.",
+      description: "Your reflection says the activation is still strong. Delay the conversation and protect your timing.",
+      actionLabel: "Pause the response",
+    },
+    th: {
+      title: "อย่าเพิ่งตอบในตอนที่อุณหภูมิอารมณ์ยังสูงอยู่",
+      description: "การทบทวนของคุณบอกว่ายังมีแรงกระตุ้นอยู่มาก เลื่อนบทสนทนาออกไปและปกป้องจังหวะของตัวเอง",
+      actionLabel: "หยุดการตอบก่อน",
+    },
+  },
+  "strong-recovery": {
+    en: {
+      title: "You made space before exploding.",
+      description: "The shift is real. Lock it in with one calmer next move while your body is still settling.",
+      actionLabel: "Choose the calmer move",
+    },
+    th: {
+      title: "คุณสร้างพื้นที่ให้ตัวเองก่อนจะระเบิดอารมณ์",
+      description: "การเปลี่ยนแปลงนี้เกิดขึ้นจริง ล็อกมันไว้ด้วยก้าวถัดไปที่สงบกว่าเดิมในขณะที่ร่างกายยังค่อย ๆ นิ่งลง",
+      actionLabel: "เลือกก้าวที่สงบกว่า",
+    },
+  },
+  timing: {
+    en: {
+      title: "Let timing do some of the work.",
+      description: "A delayed answer is still a thoughtful answer. Come back when your tone matches your intent.",
+      actionLabel: "Reply later",
+    },
+    th: {
+      title: "ให้จังหวะเวลาช่วยแบกภาระบางส่วน",
+      description: "การตอบช้าก็ยังเป็นการตอบอย่างตั้งใจได้ กลับมาตอนที่น้ำเสียงของคุณสอดคล้องกับเจตนาแล้ว",
+      actionLabel: "ค่อยตอบทีหลัง",
+    },
+  },
+  boundary: {
+    en: {
+      title: "Boundaries work better than resentment.",
+      description: "Name the limit clearly and briefly. You do not need to over-explain it.",
+      actionLabel: "Set the boundary",
+    },
+    th: {
+      title: "การตั้งขอบเขตได้ผลดีกว่าการเก็บความขุ่นใจไว้",
+      description: "บอกขอบเขตของคุณให้ชัดและสั้น คุณไม่จำเป็นต้องอธิบายมันเกินพอดี",
+      actionLabel: "ตั้งขอบเขต",
+    },
+  },
+};
+
+const badgeCatalog: Record<string, Record<Locale, Omit<Badge, "id">>> = {
+  "first-reset": {
+    en: { name: "First Reset", description: "You finished your first full emotional reset." },
+    th: { name: "รีเซ็ตครั้งแรก", description: "คุณทำการรีเซ็ตอารมณ์แบบเต็มรูปแบบครั้งแรกสำเร็จแล้ว" },
+  },
+  "three-calm-days": {
+    en: { name: "3 Calm Days", description: "You checked in on calm days without needing the full ritual." },
+    th: { name: "สงบ 3 วัน", description: "คุณเช็กอินในวันที่ใจสงบโดยไม่ต้องใช้พิธีเต็มรูปแบบ" },
+  },
+  "seven-day-awareness": {
+    en: { name: "7-Day Awareness", description: "A full week of showing up for your emotional state." },
+    th: { name: "รับรู้อารมณ์ 7 วัน", description: "คุณกลับมารับรู้อารมณ์ของตัวเองได้ต่อเนื่องครบหนึ่งสัปดาห์" },
+  },
+  "paused-before-reacting": {
+    en: { name: "Paused Before Reacting", description: "You created real distance between the trigger and your response." },
+    th: { name: "หยุดก่อนตอบสนอง", description: "คุณสร้างระยะห่างจริง ๆ ระหว่างสิ่งกระตุ้นกับการตอบสนองของตัวเอง" },
+  },
+  "quiet-win": {
+    en: { name: "Quiet Win", description: "Five check-ins logged. Not every win needs to be loud." },
+    th: { name: "ชัยชนะเงียบ ๆ", description: "คุณบันทึกเช็กอินครบห้าครั้งแล้ว ไม่ใช่ทุกชัยชนะต้องเสียงดัง" },
+  },
+  "soft-power": {
+    en: { name: "Soft Power", description: "Your recovery trend shows stronger regulation over time." },
+    th: { name: "พลังที่นุ่มนวล", description: "แนวโน้มการฟื้นตัวของคุณสะท้อนถึงการกำกับอารมณ์ที่แข็งแรงขึ้นตามเวลา" },
+  },
+};
+
 export function restoreAppState(rawState: string | null): AppState {
   if (!rawState) {
     return defaultAppState;
@@ -53,6 +193,7 @@ export function restoreAppState(rawState: string | null): AppState {
             .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
         : [],
       preferences: {
+        locale: parsed.preferences?.locale ?? defaultAppState.preferences.locale,
         soundEnabled: parsed.preferences?.soundEnabled ?? defaultAppState.preferences.soundEnabled,
         scene: parsed.preferences?.scene ?? defaultAppState.preferences.scene,
       },
@@ -73,83 +214,51 @@ export function createQuickSession(moodBefore: MoodId): EmotionSession {
   };
 }
 
-function buildSuggestion(input: FullSessionInput): Suggestion {
+export function getSuggestionById(id: string, locale: Locale): Suggestion | null {
+  const suggestion = suggestionCatalog[id]?.[locale];
+
+  if (!suggestion) {
+    return null;
+  }
+
+  return {
+    id,
+    ...suggestion,
+  };
+}
+
+export function resolveSuggestion(suggestion: Suggestion | undefined, locale: Locale) {
+  if (!suggestion) {
+    return null;
+  }
+
+  return getSuggestionById(suggestion.id, locale) ?? suggestion;
+}
+
+function buildSuggestion(input: FullSessionInput, locale: Locale): Suggestion {
   const before = clampMood(input.moodBefore);
   const after = clampMood(input.moodAfter);
 
-  const needSuggestions: Record<NeedId, Suggestion> = {
-    space: {
-      id: "space",
-      title: "Put five minutes between you and the trigger.",
-      description: "Step away, mute notifications, or postpone the reply until your body settles.",
-      actionLabel: "Take a short break",
-    },
-    clarity: {
-      id: "clarity",
-      title: "Write the real issue in one sentence.",
-      description: "Name what happened, what it meant to you, and what you need next.",
-      actionLabel: "Name the issue",
-    },
-    support: {
-      id: "support",
-      title: "Let someone steady the frame with you.",
-      description: "Send one concise message asking for perspective, backup, or just a calm check-in.",
-      actionLabel: "Reach out",
-    },
-    rest: {
-      id: "rest",
-      title: "Your system wants recovery, not another round.",
-      description: "Water, a snack, and ten quiet minutes will help more than pushing through.",
-      actionLabel: "Recover first",
-    },
-    movement: {
-      id: "movement",
-      title: "Move before you message.",
-      description: "A short walk or a minute of pacing can drain the leftover charge from your body.",
-      actionLabel: "Move for a minute",
-    },
-  };
-
   if (after >= 4) {
-    return {
-      id: "high-intensity",
-      title: "Do not answer while the temperature is still high.",
-      description: "Your reflection says the activation is still strong. Delay the conversation and protect your timing.",
-      actionLabel: "Pause the response",
-    };
+    return getSuggestionById("high-intensity", locale) ?? { id: "high-intensity", title: "", description: "", actionLabel: "" };
   }
 
   if (before - after >= 2) {
-    return {
-      id: "strong-recovery",
-      title: "You made space before exploding.",
-      description: "The shift is real. Lock it in with one calmer next move while your body is still settling.",
-      actionLabel: "Choose the calmer move",
-    };
+    return getSuggestionById("strong-recovery", locale) ?? { id: "strong-recovery", title: "", description: "", actionLabel: "" };
   }
 
   if (input.controlId === "timing") {
-    return {
-      id: "timing",
-      title: "Let timing do some of the work.",
-      description: "A delayed answer is still a thoughtful answer. Come back when your tone matches your intent.",
-      actionLabel: "Reply later",
-    };
+    return getSuggestionById("timing", locale) ?? { id: "timing", title: "", description: "", actionLabel: "" };
   }
 
   if (input.controlId === "boundary") {
-    return {
-      id: "boundary",
-      title: "Boundaries work better than resentment.",
-      description: "Name the limit clearly and briefly. You do not need to over-explain it.",
-      actionLabel: "Set the boundary",
-    };
+    return getSuggestionById("boundary", locale) ?? { id: "boundary", title: "", description: "", actionLabel: "" };
   }
 
-  return needSuggestions[input.needId];
+  return getSuggestionById(input.needId, locale) ?? { id: input.needId, title: "", description: "", actionLabel: "" };
 }
 
-export function createFullSession(input: FullSessionInput): EmotionSession {
+export function createFullSession(input: FullSessionInput, locale: Locale = "en"): EmotionSession {
   return {
     id: buildId("reset"),
     createdAt: new Date().toISOString(),
@@ -161,7 +270,7 @@ export function createFullSession(input: FullSessionInput): EmotionSession {
     needId: input.needId,
     controlId: input.controlId,
     note: input.note.trim(),
-    suggestion: buildSuggestion(input),
+    suggestion: buildSuggestion(input, locale),
     completed: true,
   };
 }
@@ -316,7 +425,17 @@ function getHeatmapWeeks(sessions: EmotionSession[], weekCount = 12): HeatmapWee
   return weeks;
 }
 
-function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[], awarenessStreak: number) {
+function getBadge(id: string, locale: Locale): Badge {
+  const copy = badgeCatalog[id]?.[locale];
+
+  return {
+    id,
+    name: copy?.name ?? id,
+    description: copy?.description ?? "",
+  };
+}
+
+function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[], awarenessStreak: number, locale: Locale) {
   const fullSessions = sessions.filter((session) => session.sessionType === "full");
   const calmDays = weeklyTrend.filter((day) => day.calmDay).length;
   const averageRecovery =
@@ -330,27 +449,15 @@ function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[]
   const badges: Badge[] = [];
 
   if (fullSessions.length >= 1) {
-    badges.push({
-      id: "first-reset",
-      name: "First Reset",
-      description: "You finished your first full emotional reset.",
-    });
+    badges.push(getBadge("first-reset", locale));
   }
 
   if (calmDays >= 3) {
-    badges.push({
-      id: "three-calm-days",
-      name: "3 Calm Days",
-      description: "You checked in on calm days without needing the full ritual.",
-    });
+    badges.push(getBadge("three-calm-days", locale));
   }
 
   if (awarenessStreak >= 7) {
-    badges.push({
-      id: "seven-day-awareness",
-      name: "7-Day Awareness",
-      description: "A full week of showing up for your emotional state.",
-    });
+    badges.push(getBadge("seven-day-awareness", locale));
   }
 
   if (
@@ -358,33 +465,21 @@ function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[]
       (session) => clampMood(session.moodBefore) - clampMood(session.moodAfter) >= 2,
     )
   ) {
-    badges.push({
-      id: "paused-before-reacting",
-      name: "Paused Before Reacting",
-      description: "You created real distance between the trigger and your response.",
-    });
+    badges.push(getBadge("paused-before-reacting", locale));
   }
 
   if (sessions.length >= 5) {
-    badges.push({
-      id: "quiet-win",
-      name: "Quiet Win",
-      description: "Five check-ins logged. Not every win needs to be loud.",
-    });
+    badges.push(getBadge("quiet-win", locale));
   }
 
   if (averageRecovery >= 1.3) {
-    badges.push({
-      id: "soft-power",
-      name: "Soft Power",
-      description: "Your recovery trend shows stronger regulation over time.",
-    });
+    badges.push(getBadge("soft-power", locale));
   }
 
   return badges;
 }
 
-export function getDerivedStats(state: AppState): DerivedStats {
+export function getDerivedStats(state: AppState, locale: Locale = state.preferences.locale): DerivedStats {
   const sessions = [...state.sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const fullSessions = sessions.filter((session) => session.sessionType === "full");
   const weeklyTrend = getWeeklyTrend(sessions);
@@ -414,21 +509,21 @@ export function getDerivedStats(state: AppState): DerivedStats {
     todayCheckIn: uniqueDays.includes(buildDayKey()),
     mostUsedTool: findTopEntry(
       fullSessions.map((session) => session.toolId),
-      (value) => getToolById(value)?.name ?? value,
+      (value) => getToolById(value, locale)?.name ?? value,
     ),
     mostUsedMethod: findTopEntry(
       fullSessions.map((session) => session.methodId),
-      (value) => getMethodById(value)?.name ?? value,
+      (value) => getMethodById(value, locale)?.name ?? value,
     ),
-    unlockedBadges: getUnlockedBadges(sessions, weeklyTrend, awarenessStreak),
+    unlockedBadges: getUnlockedBadges(sessions, weeklyTrend, awarenessStreak, locale),
     weeklyTrend,
     heatmapWeeks: getHeatmapWeeks(sessions),
     recentSessions: sessions.slice(0, 6),
   };
 }
 
-export function formatLongDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
+export function formatLongDate(value: string, locale: Locale = "en") {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -436,49 +531,63 @@ export function formatLongDate(value: string) {
   }).format(new Date(value));
 }
 
-export function formatDayLabel(dayKey: string) {
+export function formatDayLabel(dayKey: string, locale: Locale = "en") {
   const date = new Date(`${dayKey}T12:00:00`);
-  return new Intl.DateTimeFormat("en", { weekday: "short" }).format(date);
+  return new Intl.DateTimeFormat(getIntlLocale(locale), { weekday: "short" }).format(date);
 }
 
 export function formatMetric(value: number) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-export function buildCoachCopy(moodId: MoodId) {
-  const mood = getMoodById(moodId);
+export function buildCoachCopy(moodId: MoodId, locale: Locale = "en") {
+  const mood = getMoodById(moodId, locale);
 
   if (mood.value <= 2) {
-    return "Low-friction awareness counts too. Keep it easy today.";
+    return locale === "th"
+      ? "แค่รับรู้อารมณ์แบบเบา ๆ ก็มีความหมายแล้ว วันนี้เอาให้ง่ายเข้าไว้"
+      : "Low-friction awareness counts too. Keep it easy today.";
   }
 
   if (mood.value === 3) {
-    return "Enough heat to notice, but still recoverable with a short ritual.";
+    return locale === "th"
+      ? "มีความร้อนพอให้สังเกตเห็น แต่ยังฟื้นกลับมาได้ด้วยพิธีสั้น ๆ"
+      : "Enough heat to notice, but still recoverable with a short ritual.";
   }
 
-  return "High charge detected. Short pause first, response second.";
+  return locale === "th"
+    ? "ตรวจพบแรงอารมณ์สูง หยุดสั้น ๆ ก่อน แล้วค่อยตอบสนองทีหลัง"
+    : "High charge detected. Short pause first, response second.";
 }
 
-export function buildCompletionLine(session: EmotionSession) {
-  const before = getMoodById(session.moodBefore);
-  const after = getMoodById(session.moodAfter);
+export function buildCompletionLine(session: EmotionSession, locale: Locale = "en") {
+  const before = getMoodById(session.moodBefore, locale);
+  const after = getMoodById(session.moodAfter, locale);
   const delta = before.value - after.value;
 
   if (delta > 0) {
-    return `You shifted from ${before.label.toLowerCase()} to ${after.label.toLowerCase()}. That pause mattered.`;
+    return locale === "th"
+      ? `คุณเปลี่ยนจาก${before.label}ไปเป็น${after.label} การหยุดพักครั้งนี้มีความหมาย`
+      : `You shifted from ${before.label.toLowerCase()} to ${after.label.toLowerCase()}. That pause mattered.`;
   }
 
   if (delta === 0) {
-    return `You stayed at ${after.label.toLowerCase()}, but you still interrupted the spiral before acting.`;
+    return locale === "th"
+      ? `คุณยังคงอยู่ที่ระดับ${after.label} แต่คุณก็ยังหยุดวงจรเดิมไว้ก่อนลงมือทำได้`
+      : `You stayed at ${after.label.toLowerCase()}, but you still interrupted the spiral before acting.`;
   }
 
-  return `The charge is still present. Keep the next move small and slower than your first impulse.`;
+  return locale === "th"
+    ? "แรงอารมณ์ยังคงอยู่ ให้ก้าวถัดไปเล็กลงและช้ากว่าแรงกระตุ้นแรกของคุณ"
+    : "The charge is still present. Keep the next move small and slower than your first impulse.";
 }
 
-export function getControlLabel(controlId?: string) {
-  return controlOptions.find((option) => option.id === controlId)?.label ?? "Your next move";
+export function getControlLabel(controlId?: string, locale: Locale = "en") {
+  return getControlOptions(locale).find((option) => option.id === controlId)?.label ?? (locale === "th" ? "ก้าวถัดไปของคุณ" : "Your next move");
 }
 
-export function getMoodScaleSummary() {
-  return moodOptions.map((mood) => `${mood.value}. ${mood.label}`).join("  ");
+export function getMoodScaleSummary(locale: Locale = "en") {
+  return getMoodOptions(locale)
+    .map((mood) => `${mood.value}. ${mood.label}`)
+    .join("  ");
 }

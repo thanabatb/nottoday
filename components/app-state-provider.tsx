@@ -86,7 +86,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     () => true,
     () => false,
   );
-  const stats = getDerivedStats(appState);
+  const stats = getDerivedStats(appState, appState.preferences.locale);
 
   const logQuickCheckIn: AppStateContextValue["logQuickCheckIn"] = (moodId) => {
     const session = createQuickSession(moodId);
@@ -100,7 +100,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveResetSession: AppStateContextValue["saveResetSession"] = (input) => {
-    const session = createFullSession(input);
+    const session = createFullSession(input, appState.preferences.locale);
 
     startTransition(() => {
       writeState((current) => ({

@@ -14,11 +14,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="th">
       <body>
         <AppStateProvider>{children}</AppStateProvider>
       </body>
     </html>
   );
 }
-

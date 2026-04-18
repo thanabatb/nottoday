@@ -5,9 +5,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ShieldPlus, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
-import { controlOptions, getMoodById, methodOptions, moodOptions, needOptions, toolOptions } from "@/lib/session-data";
-import { buildCompletionLine, getMoodScaleSummary } from "@/lib/session-logic";
-import type { DaySummary, EmotionSession, FullSessionInput, MoodId } from "@/lib/types";
+import { LocaleToggle } from "@/components/locale-toggle";
+import { getCopy, getIntlLocale, getWeekdayLabels } from "@/lib/i18n";
+import { getControlOptions, getMoodById, getMoodOptions, getNeedOptions } from "@/lib/session-data";
+import { buildCompletionLine, formatMetric, getMoodScaleSummary, resolveSuggestion } from "@/lib/session-logic";
+import type { DaySummary, EmotionSession, FullSessionInput, Locale, MoodId } from "@/lib/types";
 
 const transition = { duration: 0.26, ease: [0.22, 1, 0.36, 1] as const };
 const moodTargetHits: Record<MoodId, number> = {
@@ -24,17 +26,19 @@ type SmashEffect = {
   rotation: number;
   size: number;
 };
-const compactWeekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 function MoodPicker({
+  locale,
   selected,
   onSelect,
   compact = false,
 }: {
+  locale: "en" | "th";
   selected: MoodId | null;
   onSelect: (moodId: MoodId) => void;
   compact?: boolean;
 }) {
+  const moodOptions = getMoodOptions(locale);
+
   return (
     <div className={`grid gap-3 ${compact ? "sm:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-5"}`}>
       {moodOptions.map((mood) => (
@@ -67,17 +71,21 @@ function MoodPicker({
 }
 
 function SoundToggleButton({
+  offLabel,
   soundEnabled,
+  onLabel,
   onToggle,
   className = "",
 }: {
+  offLabel: string;
   soundEnabled: boolean;
+  onLabel: string;
   onToggle: () => void;
   className?: string;
 }) {
   return (
     <button
-      aria-label={soundEnabled ? "Turn landing sound off" : "Turn landing sound on"}
+      aria-label={soundEnabled ? offLabel : onLabel}
       className={`sound-toggle ${className}`.trim()}
       data-enabled={soundEnabled}
       onClick={onToggle}
@@ -91,7 +99,7 @@ function SoundToggleButton({
         src="/illustrations/volume-high.svg"
         width={24}
       />
-      <span className="sr-only">{soundEnabled ? "Sound On" : "Sound Off"}</span>
+      <span className="sr-only">{soundEnabled ? onLabel : offLabel}</span>
     </button>
   );
 }
@@ -116,7 +124,9 @@ function StepHeader({
   );
 }
 
-function getHeatmapCellStyle(day: DaySummary) {
+function getHeatmapCellStyle(day: DaySummary, locale: Locale) {
+  const moodOptions = getMoodOptions(locale);
+
   if (day.completedSessions === 0) {
     return {
       background: "rgba(255, 255, 255, 0.05)",
@@ -138,25 +148,28 @@ function getHeatmapCellStyle(day: DaySummary) {
   };
 }
 
-function buildDayTitle(day: DaySummary) {
-  const formattedDay = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(
+function buildDayTitle(day: DaySummary, locale: Locale) {
+  const formattedDay = new Intl.DateTimeFormat(getIntlLocale(locale), { month: "short", day: "numeric" }).format(
     new Date(`${day.day}T12:00:00`),
   );
+  const moodOptions = getMoodOptions(locale);
 
   if (day.completedSessions === 0) {
-    return `${formattedDay}: no sessions`;
+    return locale === "th" ? `${formattedDay}: ไม่มีเซสชัน` : `${formattedDay}: no sessions`;
   }
 
   const moodValue = Math.max(1, Math.min(5, Math.round(day.averageMood || day.highestMood)));
   const mood = moodOptions[moodValue - 1];
-  return `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
+  return locale === "th"
+    ? `${formattedDay}: ${day.completedSessions} เซสชัน, โทนอารมณ์${mood.label}`
+    : `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
 }
 
 const initialDraft: FullSessionInput = {
   moodBefore: "frustrated",
   moodAfter: "irritated",
-  toolId: toolOptions[0].id,
-  methodId: methodOptions[0].id,
+  toolId: "pillow",
+  methodId: "smash",
   needId: "space",
   controlId: "response",
   note: "",
@@ -179,12 +192,18 @@ export function ResetFlow({
   const [hitCount, setHitCount] = useState(0);
   const [completedSession, setCompletedSession] = useState<EmotionSession | null>(null);
   const [usesTouchInput, setUsesTouchInput] = useState(false);
+  const locale = appState.preferences.locale;
+  const copy = getCopy(locale);
+  const needOptions = getNeedOptions(locale);
+  const controlOptions = getControlOptions(locale);
   const soundEnabled = appState.preferences.soundEnabled;
   const targetHits = moodTargetHits[draft.moodBefore];
   const releasedPercent = Math.min(100, Math.round((hitCount / targetHits) * 100));
   const angerLevel = Math.max(0, 100 - releasedPercent);
   const currentWeekDays = stats.heatmapWeeks.at(-1)?.days ?? [];
-  const currentMonthLabel = new Intl.DateTimeFormat("en", { month: "long" }).format(new Date());
+  const currentMonthLabel = new Intl.DateTimeFormat(getIntlLocale(locale), { month: "long" }).format(new Date());
+  const compactWeekdayLabels = getWeekdayLabels(locale, "compact");
+  const completionSuggestion = resolveSuggestion(completedSession?.suggestion, locale);
 
   const spawnSmashEffect = () => {
     const id = Date.now() + Math.floor(Math.random() * 10000);
@@ -232,6 +251,11 @@ export function ResetFlow({
   const handleSoundToggle = () => {
     updatePreferences({
       soundEnabled: !soundEnabled,
+    });
+  };
+  const handleLocaleToggle = () => {
+    updatePreferences({
+      locale: locale === "en" ? "th" : "en",
     });
   };
 
@@ -286,12 +310,19 @@ export function ResetFlow({
               <button className="flow-close absolute right-5 top-5" onClick={closeAndReset} type="button">
                 <X className="size-4" />
               </button>
-              <SoundToggleButton className="sound-toggle-modal" onToggle={handleSoundToggle} soundEnabled={soundEnabled} />
+              <LocaleToggle className="locale-toggle-modal" locale={locale} onToggle={handleLocaleToggle} />
+              <SoundToggleButton
+                className="sound-toggle-modal"
+                offLabel={copy.common.soundOff}
+                onLabel={copy.common.soundOn}
+                onToggle={handleSoundToggle}
+                soundEnabled={soundEnabled}
+              />
 
               <div className="border-b border-white/8 px-6 py-5 sm:px-8">
-                <p className="eyebrow mb-2">Setup Stage</p>
+                <p className="eyebrow mb-2">{copy.reset.setupStage}</p>
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm uppercase tracking-[0.32em] text-white/58">Mood</p>
+                  <p className="text-sm uppercase tracking-[0.32em] text-white/58">{copy.reset.mood}</p>
                   <span className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/55">
                     1/1
                   </span>
@@ -301,14 +332,15 @@ export function ResetFlow({
               <div className="px-6 py-6 sm:px-8 sm:py-8">
                 <div className="text-center">
                   <StepHeader
-                    description="Choose the answer that matches right now. After you pick one, the release room opens."
-                    step="Mood"
-                    title="What's your mood today?"
+                    description={copy.reset.moodDescription}
+                    step={copy.reset.mood}
+                    title={copy.reset.moodQuestion}
                   />
                   <div className="mx-auto mb-6 w-fit rounded-full border border-white/12 bg-white/[0.05] px-5 py-3 text-sm leading-7 text-white/66">
-                    Current answer: {getMoodById(draft.moodBefore).label}
+                    {copy.reset.currentAnswer}: {getMoodById(draft.moodBefore, locale).label}
                   </div>
                   <MoodPicker
+                    locale={locale}
                     onSelect={(moodBefore) => {
                       setDraft((current) => ({ ...current, moodBefore }));
                       setPillowBroken(false);
@@ -326,7 +358,7 @@ export function ResetFlow({
                     onClick={closeAndReset}
                     type="button"
                   >
-                    Cancel
+                    {copy.common.cancel}
                   </button>
                 </div>
               </div>
@@ -342,7 +374,13 @@ export function ResetFlow({
           style={stepIndex >= 2 ? { backgroundImage: "url('/illustrations/reflect_bg.png')" } : undefined}
         >
           <div className="relative mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-8">
-          <SoundToggleButton onToggle={handleSoundToggle} soundEnabled={soundEnabled} />
+          <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
+          <SoundToggleButton
+            offLabel={copy.common.soundOff}
+            onLabel={copy.common.soundOn}
+            onToggle={handleSoundToggle}
+            soundEnabled={soundEnabled}
+          />
           {stepIndex === 1 ? (
               <div className="relative min-h-[calc(100vh-3rem)] sm:min-h-[86vh]">
                 <button
@@ -350,13 +388,13 @@ export function ResetFlow({
                   onClick={closeAndReset}
                   type="button"
                 >
-                  Exit
+                  {copy.common.exit}
                 </button>
 
                 <div className="flex min-h-[calc(100vh-3rem)] flex-col gap-5 pb-24 pt-16 sm:block sm:min-h-[86vh] sm:pb-0 sm:pt-0">
                   <div className="mx-auto w-full max-w-sm rounded-[28px] border border-white/12 bg-black/30 p-4 text-white shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-md sm:absolute sm:left-0 sm:top-1/2 sm:mx-0 sm:w-40 sm:max-w-none sm:-translate-y-1/2 sm:p-4 md:w-44 lg:w-48 lg:p-5">
-                    <p className="text-[0.68rem] uppercase tracking-[0.28em] text-white/52">Release Status</p>
-                    <p className="mt-2 text-sm text-white/62">{getMoodById(draft.moodBefore).label} mood</p>
+                    <p className="text-[0.68rem] uppercase tracking-[0.28em] text-white/52">{copy.reset.releaseStatus}</p>
+                    <p className="mt-2 text-sm text-white/62">{getMoodById(draft.moodBefore, locale).label}</p>
                     <div className="mt-5 flex items-end gap-4">
                       <div className="relative h-40 w-5 overflow-hidden rounded-full bg-white/10 sm:h-56 md:h-64">
                         <motion.div
@@ -366,18 +404,18 @@ export function ResetFlow({
                         />
                       </div>
                       <div className="pb-1">
-                        <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/45">Anger Level</p>
+                        <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/45">{copy.reset.angerLevel}</p>
                         <p className="mt-2 text-3xl font-semibold text-white">{angerLevel}%</p>
-                        <p className="mt-1 text-sm text-white/56">{targetHits} hits to empty</p>
+                        <p className="mt-1 text-sm text-white/56">{targetHits} {copy.reset.hitsToEmpty}</p>
                       </div>
                     </div>
                     <div className="mt-5 grid gap-3 sm:block sm:space-y-3">
                       <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
-                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Released</p>
+                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">{copy.reset.released}</p>
                         <p className="mt-1 text-2xl font-semibold text-white">{100 - angerLevel}%</p>
                       </div>
                       <div className="rounded-[20px] border border-white/10 bg-white/[0.05] px-4 py-3">
-                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">Hits</p>
+                        <p className="text-[0.65rem] uppercase tracking-[0.24em] text-white/45">{copy.reset.hits}</p>
                         <p className="mt-1 text-2xl font-semibold text-white">{hitCount}</p>
                       </div>
                     </div>
@@ -385,7 +423,7 @@ export function ResetFlow({
 
                   <div className="mx-auto w-full max-w-[18rem] sm:absolute sm:left-1/2 sm:top-1/2 sm:max-w-none sm:w-[20rem] sm:-translate-x-1/2 sm:-translate-y-1/2 md:w-[24rem] lg:w-[28rem]">
                     <p className="mb-4 text-center text-[0.68rem] uppercase tracking-[0.26em] text-white/60">
-                      {usesTouchInput ? "Tap" : "Click"} the pillow to release pressure
+                      {usesTouchInput ? copy.reset.tapPillow : copy.reset.clickPillow}
                     </p>
                     <div className="relative">
                       <AnimatePresence>
@@ -458,7 +496,7 @@ export function ResetFlow({
                       onClick={() => setStepIndex(2)}
                       type="button"
                     >
-                      I&apos;m good now
+                      {copy.reset.finishRelease}
                     </button>
                   </div>
                 </div>
@@ -469,10 +507,10 @@ export function ResetFlow({
               <div className="mx-auto max-w-5xl">
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
-                    <p className="eyebrow mb-3">Reflection</p>
-                    <h2 className="text-5xl leading-none sm:text-6xl">What feels true now?</h2>
+                    <p className="eyebrow mb-3">{copy.reset.reflection}</p>
+                    <h2 className="text-5xl leading-none sm:text-6xl">{copy.reset.reflectionTitle}</h2>
                     <p className="mt-4 max-w-2xl text-base leading-8 text-white/68">
-                      The release is over. Capture what changed and what you need next.
+                      {copy.reset.reflectionDescription}
                     </p>
                   </div>
 
@@ -483,16 +521,17 @@ export function ResetFlow({
 
                 <div className="space-y-6">
                   <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">How intense is it now?</p>
+                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.intenseNow}</p>
                     <MoodPicker
                       compact
                       onSelect={(moodAfter) => setDraft((current) => ({ ...current, moodAfter }))}
+                      locale={locale}
                       selected={draft.moodAfter}
                     />
                   </div>
 
                   <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">What do you need most?</p>
+                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.needMost}</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       {needOptions.map((option) => (
                         <button
@@ -513,7 +552,7 @@ export function ResetFlow({
                   </div>
 
                   <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">What part is within your control?</p>
+                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.withinControl}</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       {controlOptions.map((option) => (
                         <button
@@ -535,7 +574,7 @@ export function ResetFlow({
 
                   <div className="flow-panel p-5">
                     <label className="mb-3 block text-sm font-medium text-white/74" htmlFor="session-note">
-                      Optional note
+                      {copy.reset.optionalNote}
                     </label>
                     <textarea
                       className="min-h-28 w-full rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
@@ -546,7 +585,7 @@ export function ResetFlow({
                           note: event.target.value,
                         }))
                       }
-                      placeholder="What sits underneath the anger?"
+                      placeholder={copy.reset.notePlaceholder}
                       value={draft.note}
                     />
                   </div>
@@ -558,7 +597,7 @@ export function ResetFlow({
                     onClick={() => setStepIndex(1)}
                     type="button"
                   >
-                    Back To Release Room
+                    {copy.reset.backToReleaseRoom}
                   </button>
 
                   <button
@@ -570,7 +609,7 @@ export function ResetFlow({
                     }}
                     type="button"
                   >
-                    View Summary
+                    {copy.reset.viewSummary}
                     <ArrowRight className="size-4" />
                   </button>
                 </div>
@@ -581,10 +620,10 @@ export function ResetFlow({
               <div className="mx-auto max-w-5xl">
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
-                    <p className="eyebrow mb-3">End</p>
-                    <h2 className="text-5xl leading-none sm:text-6xl">You interrupted the spiral.</h2>
+                    <p className="eyebrow mb-3">{copy.reset.end}</p>
+                    <h2 className="text-5xl leading-none sm:text-6xl">{copy.reset.interruptedTitle}</h2>
                     <p className="mt-4 max-w-2xl text-base leading-8 text-white/68">
-                      {buildCompletionLine(completedSession)}
+                      {buildCompletionLine(completedSession, locale)}
                     </p>
                   </div>
 
@@ -597,27 +636,28 @@ export function ResetFlow({
                   <div className="flow-panel bg-[linear-gradient(180deg,rgba(145,244,196,0.16),rgba(255,255,255,0.04))] p-6">
                     <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/20 px-3 py-1 text-xs uppercase tracking-[0.24em] text-emerald-100/75">
                       <Sparkles className="size-4" />
-                      Suggested next step
+                      {copy.reset.suggestedNextStep}
                     </div>
-                    <h3 className="mt-4 text-3xl">{completedSession.suggestion?.title}</h3>
-                    <p className="mt-4 text-sm leading-7 text-white/70">{completedSession.suggestion?.description}</p>
+                    <h3 className="mt-4 text-3xl">{completionSuggestion?.title}</h3>
+                    <p className="mt-4 text-sm leading-7 text-white/70">{completionSuggestion?.description}</p>
                     <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-3 text-sm font-semibold text-slate-950">
                       <ShieldPlus className="size-4" />
-                      {completedSession.suggestion?.actionLabel}
+                      {completionSuggestion?.actionLabel}
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flow-panel p-5">
-                      <p className="eyebrow mb-3">Mood shift</p>
+                      <p className="eyebrow mb-3">{copy.reset.moodShift}</p>
                       <p className="text-xl font-semibold text-white/92">
-                        {getMoodById(completedSession.moodBefore).label} to {getMoodById(completedSession.moodAfter).label}
+                        {getMoodById(completedSession.moodBefore, locale).label} {copy.reset.moodShiftConnector}{" "}
+                        {getMoodById(completedSession.moodAfter, locale).label}
                       </p>
                     </div>
                     <div className="flow-panel p-5">
-                      <p className="eyebrow mb-3">Awareness streak</p>
+                      <p className="eyebrow mb-3">{copy.reset.awarenessStreak}</p>
                       <p className="text-xl font-semibold text-white/92">
-                        {stats.awarenessStreak} day{stats.awarenessStreak === 1 ? "" : "s"}
+                        {stats.awarenessStreak} {stats.awarenessStreak === 1 ? copy.common.day : copy.common.days}
                       </p>
                       <div className="mt-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
                         <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/38">{currentMonthLabel}</p>
@@ -629,8 +669,8 @@ export function ResetFlow({
                               </p>
                               <div
                                 className="h-6 w-6 rounded-[7px] border sm:h-7 sm:w-7"
-                                style={getHeatmapCellStyle(day)}
-                                title={buildDayTitle(day)}
+                                style={getHeatmapCellStyle(day, locale)}
+                                title={buildDayTitle(day, locale)}
                               />
                               <p className="text-[0.6rem] text-white/36">
                                 {new Date(`${day.day}T12:00:00`).getDate()}
@@ -640,13 +680,13 @@ export function ResetFlow({
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-3 text-xs leading-5 text-white/54">
-                        <span>Longest: {stats.longestAwarenessStreak} days</span>
-                        <span>Avg mood: {stats.totalSessions > 0 ? stats.averageMood.toFixed(1) : "0.0"}/5</span>
+                        <span>{copy.reset.longest}: {stats.longestAwarenessStreak} {copy.common.days}</span>
+                        <span>{copy.reset.averageMood}: {stats.totalSessions > 0 ? formatMetric(stats.averageMood) : "0.0"}/5</span>
                       </div>
                     </div>
                     <div className="flow-panel p-5">
-                      <p className="eyebrow mb-3">Scale</p>
-                      <p className="text-sm leading-7 text-white/65">{getMoodScaleSummary()}</p>
+                      <p className="eyebrow mb-3">{copy.reset.scale}</p>
+                      <p className="text-sm leading-7 text-white/65">{getMoodScaleSummary(locale)}</p>
                     </div>
                   </div>
                 </div>
@@ -657,7 +697,7 @@ export function ResetFlow({
                     onClick={closeAndReset}
                     type="button"
                   >
-                    Close
+                    {copy.common.close}
                   </button>
                 </div>
               </div>
