@@ -49,6 +49,7 @@ export interface EmotionSession {
   sessionType: SessionType;
   moodBefore: MoodId;
   moodAfter: MoodId;
+  releaseHitCount?: number;
   toolId?: string;
   methodId?: MethodId;
   note?: string;
@@ -72,6 +73,7 @@ export interface AppState {
 export interface FullSessionInput {
   moodBefore: MoodId;
   moodAfter: MoodId;
+  releaseHitCount?: number;
   toolId: string;
   methodId: MethodId;
   needId: NeedId;
@@ -99,17 +101,25 @@ export interface Badge {
   description: string;
 }
 
+export interface MoodCountSummary {
+  moodId: MoodId;
+  count: number;
+}
+
 export interface DerivedStats {
   awarenessStreak: number;
   longestAwarenessStreak: number;
   calmDays: number;
   totalSessions: number;
   fullSessions: number;
+  totalReleaseCount: number;
   averageMood: number;
   averageRecovery: number;
   todayCheckIn: boolean;
   mostUsedTool: string | null;
   mostUsedMethod: string | null;
+  moodOnEntry: MoodCountSummary[];
+  moodOnFinish: MoodCountSummary[];
   unlockedBadges: Badge[];
   weeklyTrend: DaySummary[];
   heatmapWeeks: HeatmapWeek[];

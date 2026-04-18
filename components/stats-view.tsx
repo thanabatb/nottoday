@@ -7,7 +7,7 @@ import { LocaleToggle } from "@/components/locale-toggle";
 import { getCopy, getIntlLocale, getWeekdayLabels } from "@/lib/i18n";
 import { getMoodById, getMoodOptions } from "@/lib/session-data";
 import { formatLongDate, formatMetric, resolveSuggestion } from "@/lib/session-logic";
-import type { DaySummary } from "@/lib/types";
+import type { DaySummary, MoodCountSummary } from "@/lib/types";
 
 function formatWeekLabel(weekStart: string, locale: "en" | "th") {
   return new Intl.DateTimeFormat(getIntlLocale(locale), { month: "short", day: "numeric" }).format(new Date(`${weekStart}T12:00:00`));
@@ -67,6 +67,42 @@ function MetricCard({
       <p className="eyebrow mb-2">{label}</p>
       <p className="text-3xl font-semibold text-white/92">{value}</p>
       <p className="mt-3 text-sm leading-6 text-white/58">{detail}</p>
+    </div>
+  );
+}
+
+function MoodCountList({
+  counts,
+  emptyLabel,
+  locale,
+}: {
+  counts: MoodCountSummary[];
+  emptyLabel: string;
+  locale: "en" | "th";
+}) {
+  if (counts.length === 0) {
+    return <p className="text-sm leading-6 text-white/56">{emptyLabel}</p>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-3">
+      {counts.map((entry) => {
+        const mood = getMoodById(entry.moodId, locale);
+
+        return (
+          <div
+            key={entry.moodId}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/78"
+          >
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: mood.accent, boxShadow: `0 0 0 1px ${mood.glow} inset` }}
+            />
+            <span>{mood.label}</span>
+            <span className="text-white/44">{entry.count}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -207,7 +243,7 @@ export function StatsView() {
                 {stats.mostUsedTool ?? copy.stats.noFullRitual}
               </p>
               <p className="mt-2 text-sm leading-6 text-white/58">
-                {locale === "th" ? "รูปแบบที่ใช้บ่อย:" : "Most-used method:"} {stats.mostUsedMethod ?? copy.stats.noMethodData}
+                {copy.stats.mostUsedMethodLabel}: {stats.mostUsedMethod ?? copy.stats.noMethodData}
               </p>
             </div>
 
@@ -233,6 +269,37 @@ export function StatsView() {
           </div>
         </section>
       </div>
+
+      <section className="mt-8 surface p-6 sm:p-8">
+        <div className="mb-6">
+          <p className="eyebrow mb-3">{copy.stats.releaseProfile}</p>
+          <h2 className="text-3xl">{copy.stats.releaseProfileTitle}</h2>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="surface-soft p-4">
+            <p className="text-sm text-white/55">{copy.stats.totalReleaseCount}</p>
+            <p className="mt-2 text-3xl font-semibold text-white/92">{stats.totalReleaseCount}</p>
+            <p className="mt-2 text-sm leading-6 text-white/58">{copy.stats.totalReleaseCountDetail}</p>
+          </div>
+
+          <div className="surface-soft p-4">
+            <p className="text-sm text-white/55">{copy.stats.moodOnEntry}</p>
+            <div className="mt-3">
+              <MoodCountList counts={stats.moodOnEntry} emptyLabel={copy.stats.noReleaseData} locale={locale} />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-white/58">{copy.stats.moodOnEntryDetail}</p>
+          </div>
+
+          <div className="surface-soft p-4">
+            <p className="text-sm text-white/55">{copy.stats.moodOnFinish}</p>
+            <div className="mt-3">
+              <MoodCountList counts={stats.moodOnFinish} emptyLabel={copy.stats.noReleaseData} locale={locale} />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-white/58">{copy.stats.moodOnFinishDetail}</p>
+          </div>
+        </div>
+      </section>
 
       <section className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.1fr]">
         <div className="surface p-6 sm:p-8">

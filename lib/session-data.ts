@@ -106,8 +106,8 @@ const toolEntries = [
   {
     id: "pillow",
     copy: {
-      en: { name: "Impact Pillow", description: "Soft, safe, and ideal for quick pressure release." },
-      th: { name: "หมอนปล่อยแรง", description: "นุ่ม ปลอดภัย และเหมาะกับการระบายแรงกดดันอย่างรวดเร็ว" },
+      en: { name: "Smash Pillow", description: "A soft target for releasing heat safely, one hit at a time." },
+      th: { name: "ทุบหมอน", description: "เป้าหมายที่นุ่มและปลอดภัยสำหรับระบายความเดือดออกทีละหมัด" },
     },
   },
   {

@@ -9,6 +9,7 @@ import type {
   FullSessionInput,
   HeatmapWeek,
   Locale,
+  MoodCountSummary,
   MoodId,
   Suggestion,
 } from "@/lib/types";
@@ -265,6 +266,7 @@ export function createFullSession(input: FullSessionInput, locale: Locale = "en"
     sessionType: "full",
     moodBefore: input.moodBefore,
     moodAfter: input.moodAfter,
+    releaseHitCount: input.releaseHitCount ?? 0,
     toolId: input.toolId,
     methodId: input.methodId,
     needId: input.needId,
@@ -479,6 +481,22 @@ function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[]
   return badges;
 }
 
+function countMoods(sessions: EmotionSession[], key: "moodBefore" | "moodAfter"): MoodCountSummary[] {
+  const counts = new Map<MoodId, number>();
+
+  sessions.forEach((session) => {
+    const moodId = session[key];
+    counts.set(moodId, (counts.get(moodId) ?? 0) + 1);
+  });
+
+  return getMoodOptions("en")
+    .map((mood) => ({
+      moodId: mood.id,
+      count: counts.get(mood.id) ?? 0,
+    }))
+    .filter((entry) => entry.count > 0);
+}
+
 export function getDerivedStats(state: AppState, locale: Locale = state.preferences.locale): DerivedStats {
   const sessions = [...state.sessions].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   const fullSessions = sessions.filter((session) => session.sessionType === "full");
@@ -497,6 +515,7 @@ export function getDerivedStats(state: AppState, locale: Locale = state.preferen
           0,
         ) / fullSessions.length
       : 0;
+  const totalReleaseCount = fullSessions.reduce((total, session) => total + (session.releaseHitCount ?? 0), 0);
 
   return {
     awarenessStreak,
@@ -504,6 +523,7 @@ export function getDerivedStats(state: AppState, locale: Locale = state.preferen
     calmDays: weeklyTrend.filter((day) => day.calmDay).length,
     totalSessions: sessions.length,
     fullSessions: fullSessions.length,
+    totalReleaseCount,
     averageMood,
     averageRecovery,
     todayCheckIn: uniqueDays.includes(buildDayKey()),
@@ -515,6 +535,8 @@ export function getDerivedStats(state: AppState, locale: Locale = state.preferen
       fullSessions.map((session) => session.methodId),
       (value) => getMethodById(value, locale)?.name ?? value,
     ),
+    moodOnEntry: countMoods(fullSessions, "moodBefore"),
+    moodOnFinish: countMoods(fullSessions, "moodAfter"),
     unlockedBadges: getUnlockedBadges(sessions, weeklyTrend, awarenessStreak, locale),
     weeklyTrend,
     heatmapWeeks: getHeatmapWeeks(sessions),

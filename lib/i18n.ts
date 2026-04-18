@@ -40,6 +40,7 @@ type TranslationTree = {
     notePlaceholder: string;
     backToReleaseRoom: string;
     viewSummary: string;
+    viewPattern: string;
     end: string;
     interruptedTitle: string;
     suggestedNextStep: string;
@@ -63,6 +64,14 @@ type TranslationTree = {
     recoveryScoreDetail: string;
     totalSessions: string;
     totalSessionsDetail: string;
+    releaseProfile: string;
+    releaseProfileTitle: string;
+    totalReleaseCount: string;
+    totalReleaseCountDetail: string;
+    moodOnEntry: string;
+    moodOnEntryDetail: string;
+    moodOnFinish: string;
+    moodOnFinishDetail: string;
     weeklyHeatmap: string;
     weeklyHeatmapTitle: string;
     highlights: string;
@@ -87,6 +96,8 @@ type TranslationTree = {
     longestStreak: string;
     currentStreak: string;
     weeklyHeatmapSummary: string;
+    noReleaseData: string;
+    mostUsedMethodLabel: string;
   };
 };
 
@@ -131,6 +142,7 @@ const translations: Record<Locale, TranslationTree> = {
       notePlaceholder: "What sits underneath the anger?",
       backToReleaseRoom: "Back To Release Room",
       viewSummary: "View Summary",
+      viewPattern: "View your pattern",
       end: "End",
       interruptedTitle: "You interrupted the spiral.",
       suggestedNextStep: "Suggested next step",
@@ -154,6 +166,14 @@ const translations: Record<Locale, TranslationTree> = {
       recoveryScoreDetail: "Average drop from before to after on full reset sessions.",
       totalSessions: "Total sessions",
       totalSessionsDetail: "All quick check-ins and full sessions combined.",
+      releaseProfile: "Release profile",
+      releaseProfileTitle: "How your release sessions are shaping up.",
+      totalReleaseCount: "Total release count",
+      totalReleaseCountDetail: "Combined pillow hits across completed release sessions.",
+      moodOnEntry: "Mood on entry",
+      moodOnEntryDetail: "How you usually arrive before the release starts.",
+      moodOnFinish: "Mood on finish",
+      moodOnFinishDetail: "Where your mood tends to land after release.",
       weeklyHeatmap: "Weekly heatmap",
       weeklyHeatmapTitle: "Emotion streaks across the last 12 weeks.",
       highlights: "Highlights",
@@ -178,6 +198,8 @@ const translations: Record<Locale, TranslationTree> = {
       longestStreak: "Longest streak",
       currentStreak: "Current streak",
       weeklyHeatmapSummary: "Current week emotional streak",
+      noReleaseData: "This fills in after your first completed release session.",
+      mostUsedMethodLabel: "Most-used method",
     },
   },
   th: {
@@ -220,6 +242,7 @@ const translations: Record<Locale, TranslationTree> = {
       notePlaceholder: "อะไรคือสิ่งที่ซ่อนอยู่ใต้ความโกรธนี้?",
       backToReleaseRoom: "กลับไปที่ห้องระบาย",
       viewSummary: "ดูสรุป",
+      viewPattern: "ดูรูปแบบของคุณ",
       end: "จบ",
       interruptedTitle: "คุณหยุดวงจรเดิมได้แล้ว",
       suggestedNextStep: "ก้าวถัดไปที่แนะนำ",
@@ -243,12 +266,20 @@ const translations: Record<Locale, TranslationTree> = {
       recoveryScoreDetail: "ค่าเฉลี่ยของระดับอารมณ์ที่ลดลงหลังทำ full reset",
       totalSessions: "จำนวนเซสชันทั้งหมด",
       totalSessionsDetail: "รวมทั้ง quick check-in และ full session",
-      weeklyHeatmap: "ฮีตแมปรายสัปดาห์",
-      weeklyHeatmapTitle: "สตรีคอารมณ์ย้อนหลัง 12 สัปดาห์",
+      releaseProfile: "รูปแบบการระบาย",
+      releaseProfileTitle: "ภาพรวมว่าการระบายของคุณกำลังเป็นอย่างไร",
+      totalReleaseCount: "จำนวนครั้งที่ระบายทั้งหมด",
+      totalReleaseCountDetail: "จำนวนครั้งที่กดหมอนรวมจากทุกเซสชันที่ระบายเสร็จสมบูรณ์",
+      moodOnEntry: "อารมณ์ตอนเริ่ม",
+      moodOnEntryDetail: "คุณมักเข้ามาด้วยอารมณ์แบบไหนก่อนเริ่มระบาย",
+      moodOnFinish: "อารมณ์ตอนจบ",
+      moodOnFinishDetail: "อารมณ์ของคุณมักไปจบที่ตรงไหนหลังระบายเสร็จ",
+      weeklyHeatmap: "ภาพรวมรายสัปดาห์",
+      weeklyHeatmapTitle: "สถิติอารมณ์ย้อนหลัง 12 สัปดาห์",
       highlights: "ไฮไลต์",
       highlightsTitle: "ภาพรวมของรูปแบบอารมณ์ตอนนี้",
-      mostUsedRitual: "พิธีที่ใช้บ่อยที่สุด",
-      noFullRitual: "ยังไม่มีพิธีเต็มรูปแบบ",
+      mostUsedRitual: "วิธีที่ใช้บ่อยที่สุด",
+      noFullRitual: "ยังไม่มีวิธีเต็มรูปแบบ",
       noMethodData: "ยังไม่มีข้อมูลรูปแบบ",
       highestRecentDay: "วันที่อารมณ์สูงสุดล่าสุด",
       noLoggedSpikes: "สัปดาห์นี้ยังไม่มีวันที่อารมณ์พุ่ง",
@@ -264,9 +295,11 @@ const translations: Record<Locale, TranslationTree> = {
       fullResetSession: "เซสชันรีเซ็ตเต็มรูปแบบ",
       quickCheckIn: "เช็กอินแบบรวดเร็ว",
       averageMood: "อารมณ์เฉลี่ย",
-      longestStreak: "สตรีคยาวที่สุด",
-      currentStreak: "สตรีคปัจจุบัน",
-      weeklyHeatmapSummary: "สตรีคอารมณ์ของสัปดาห์นี้",
+      longestStreak: "ต่อเนื่องยาวที่สุด",
+      currentStreak: "ต่อเนื่องปัจจุบัน",
+      weeklyHeatmapSummary: "ต่อเนื่องอารมณ์ของสัปดาห์นี้",
+      noReleaseData: "ส่วนนี้จะเริ่มแสดงหลังจากคุณทำเซสชันระบายครบครั้งแรก",
+      mostUsedMethodLabel: "รูปแบบที่ใช้บ่อย",
     },
   },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ShieldPlus, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -603,7 +604,10 @@ export function ResetFlow({
                   <button
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
                     onClick={() => {
-                      const session = saveResetSession(draft);
+                      const session = saveResetSession({
+                        ...draft,
+                        releaseHitCount: hitCount,
+                      });
                       setCompletedSession(session);
                       setStepIndex(3);
                     }}
@@ -691,7 +695,14 @@ export function ResetFlow({
                   </div>
                 </div>
 
-                <div className="mt-10 flex justify-end">
+                <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <Link
+                    className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
+                    href="/stats"
+                    onClick={closeAndReset}
+                  >
+                    {copy.reset.viewPattern}
+                  </Link>
                   <button
                     className="rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/72 transition hover:border-white/22 hover:bg-white/[0.08]"
                     onClick={closeAndReset}
