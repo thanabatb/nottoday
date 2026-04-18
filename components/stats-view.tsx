@@ -3,8 +3,51 @@
 import Link from "next/link";
 import { ArrowLeft, BarChart3, FlameKindling, Trophy } from "lucide-react";
 import { useAppState } from "@/components/app-state-provider";
-import { getMoodById } from "@/lib/session-data";
-import { formatDayLabel, formatLongDate, formatMetric } from "@/lib/session-logic";
+import { getMoodById, moodOptions } from "@/lib/session-data";
+import { formatLongDate, formatMetric } from "@/lib/session-logic";
+import type { DaySummary } from "@/lib/types";
+
+const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+
+function formatWeekLabel(weekStart: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(`${weekStart}T12:00:00`));
+}
+
+function getHeatmapCellStyle(day: DaySummary) {
+  if (day.completedSessions === 0) {
+    return {
+      background: "rgba(255, 255, 255, 0.05)",
+      borderColor: "rgba(255, 255, 255, 0.06)",
+      boxShadow: "none",
+    };
+  }
+
+  const moodIndex = Math.max(0, Math.min(moodOptions.length - 1, Math.round(day.averageMood || day.highestMood) - 1));
+  const mood = moodOptions[moodIndex];
+  const strength = Math.min(0.92, 0.38 + day.completedSessions * 0.14);
+
+  return {
+    background: `${mood.accent}${Math.round(strength * 255)
+      .toString(16)
+      .padStart(2, "0")}`,
+    borderColor: `${mood.accent}66`,
+    boxShadow: `0 0 0 1px ${mood.glow} inset`,
+  };
+}
+
+function buildDayTitle(day: DaySummary) {
+  const formattedDay = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(
+    new Date(`${day.day}T12:00:00`),
+  );
+
+  if (day.completedSessions === 0) {
+    return `${formattedDay}: no sessions`;
+  }
+
+  const moodValue = Math.max(1, Math.min(5, Math.round(day.averageMood || day.highestMood)));
+  const mood = moodOptions[moodValue - 1];
+  return `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
+}
 
 function MetricCard({
   label,
@@ -72,38 +115,63 @@ export function StatsView() {
         <section className="surface p-6 sm:p-8">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="eyebrow mb-3">Weekly trend</p>
-              <h2 className="text-3xl">Mood intensity across the last 7 days.</h2>
+              <p className="eyebrow mb-3">Weekly heatmap</p>
+              <h2 className="text-3xl">Emotion streaks across the last 12 weeks.</h2>
             </div>
             <BarChart3 className="size-6 text-white/45" />
           </div>
 
-          <div className="grid min-h-72 grid-cols-7 items-end gap-3">
-            {stats.weeklyTrend.map((day) => {
-              const height = day.averageMood > 0 ? `${Math.max(18, day.averageMood * 18)}%` : "10%";
-              const tone =
-                day.averageMood <= 2
-                  ? "linear-gradient(180deg,#7ee7d1,#52b7c4)"
-                  : day.averageMood <= 3.4
-                    ? "linear-gradient(180deg,#f4cf78,#ef9d54)"
-                    : "linear-gradient(180deg,#f28b69,#ef5f67)";
+          <div className="overflow-x-auto pb-3">
+            <div className="flex min-w-max items-start gap-2">
+              <div className="mt-7 flex flex-col gap-2 pr-2">
+                {weekdayLabels.map((label) => (
+                  <div
+                    key={label}
+                    className="flex h-5 w-5 items-center justify-center text-[0.65rem] uppercase tracking-[0.2em] text-white/34 sm:h-6 sm:w-6"
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
 
-              return (
-                <div key={day.day} className="flex h-full flex-col items-center justify-end gap-3">
-                  <div className="flex w-full flex-1 items-end">
-                    <div className="w-full overflow-hidden rounded-t-[18px] bg-white/6">
-                      <div className="rounded-t-[18px] transition-all" style={{ height, background: tone }} />
-                    </div>
+              {stats.heatmapWeeks.map((week, index) => (
+                <div key={week.weekStart} className="flex flex-col items-center gap-2">
+                  <div className="h-5 text-center text-[0.62rem] uppercase tracking-[0.18em] text-white/38">
+                    {index % 2 === 0 ? formatWeekLabel(week.weekStart) : ""}
                   </div>
-                  <div className="text-center">
-                    <p className="text-xs uppercase tracking-[0.22em] text-white/42">{formatDayLabel(day.day)}</p>
-                    <p className="mt-1 text-sm text-white/66">
-                      {day.completedSessions > 0 ? formatMetric(day.averageMood) : "–"}
-                    </p>
-                  </div>
+
+                  {week.days.map((day) => (
+                    <div
+                      key={day.day}
+                      className="h-5 w-5 rounded-[6px] border transition-transform hover:scale-110 sm:h-6 sm:w-6"
+                      style={getHeatmapCellStyle(day)}
+                      title={buildDayTitle(day)}
+                    />
+                  ))}
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm leading-6 text-white/64">
+            <span>Average mood: {stats.totalSessions > 0 ? formatMetric(stats.averageMood) : "0.0"}/5</span>
+            <span>Longest streak: {stats.longestAwarenessStreak} days</span>
+            <span>Current streak: {stats.awarenessStreak} day{stats.awarenessStreak === 1 ? "" : "s"}</span>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            {moodOptions.map((mood) => (
+              <div
+                key={mood.id}
+                className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-[0.16em] text-white/56"
+              >
+                <span
+                  className="h-3 w-3 rounded-[4px] border"
+                  style={{ background: mood.accent, borderColor: `${mood.accent}66` }}
+                />
+                {mood.label}
+              </div>
+            ))}
           </div>
         </section>
 

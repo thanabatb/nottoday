@@ -86,6 +86,11 @@ export interface DaySummary {
   completedSessions: number;
 }
 
+export interface HeatmapWeek {
+  weekStart: string;
+  days: DaySummary[];
+}
+
 export interface Badge {
   id: string;
   name: string;
@@ -94,6 +99,7 @@ export interface Badge {
 
 export interface DerivedStats {
   awarenessStreak: number;
+  longestAwarenessStreak: number;
   calmDays: number;
   totalSessions: number;
   fullSessions: number;
@@ -104,6 +110,6 @@ export interface DerivedStats {
   mostUsedMethod: string | null;
   unlockedBadges: Badge[];
   weeklyTrend: DaySummary[];
+  heatmapWeeks: HeatmapWeek[];
   recentSessions: EmotionSession[];
 }
-

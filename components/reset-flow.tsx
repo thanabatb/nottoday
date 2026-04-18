@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { controlOptions, getMoodById, methodOptions, moodOptions, needOptions, toolOptions } from "@/lib/session-data";
 import { buildCompletionLine, getMoodScaleSummary } from "@/lib/session-logic";
-import type { EmotionSession, FullSessionInput, MoodId } from "@/lib/types";
+import type { DaySummary, EmotionSession, FullSessionInput, MoodId } from "@/lib/types";
 
 const transition = { duration: 0.26, ease: [0.22, 1, 0.36, 1] as const };
 const moodTargetHits: Record<MoodId, number> = {
@@ -24,6 +24,7 @@ type SmashEffect = {
   rotation: number;
   size: number;
 };
+const compactWeekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function MoodPicker({
   selected,
@@ -115,6 +116,42 @@ function StepHeader({
   );
 }
 
+function getHeatmapCellStyle(day: DaySummary) {
+  if (day.completedSessions === 0) {
+    return {
+      background: "rgba(255, 255, 255, 0.05)",
+      borderColor: "rgba(255, 255, 255, 0.06)",
+      boxShadow: "none",
+    };
+  }
+
+  const moodIndex = Math.max(0, Math.min(moodOptions.length - 1, Math.round(day.averageMood || day.highestMood) - 1));
+  const mood = moodOptions[moodIndex];
+  const strength = Math.min(0.92, 0.38 + day.completedSessions * 0.14);
+
+  return {
+    background: `${mood.accent}${Math.round(strength * 255)
+      .toString(16)
+      .padStart(2, "0")}`,
+    borderColor: `${mood.accent}66`,
+    boxShadow: `0 0 0 1px ${mood.glow} inset`,
+  };
+}
+
+function buildDayTitle(day: DaySummary) {
+  const formattedDay = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(
+    new Date(`${day.day}T12:00:00`),
+  );
+
+  if (day.completedSessions === 0) {
+    return `${formattedDay}: no sessions`;
+  }
+
+  const moodValue = Math.max(1, Math.min(5, Math.round(day.averageMood || day.highestMood)));
+  const mood = moodOptions[moodValue - 1];
+  return `${formattedDay}: ${day.completedSessions} session${day.completedSessions === 1 ? "" : "s"}, ${mood.label.toLowerCase()} tone`;
+}
+
 const initialDraft: FullSessionInput = {
   moodBefore: "frustrated",
   moodAfter: "irritated",
@@ -146,6 +183,8 @@ export function ResetFlow({
   const targetHits = moodTargetHits[draft.moodBefore];
   const releasedPercent = Math.min(100, Math.round((hitCount / targetHits) * 100));
   const angerLevel = Math.max(0, 100 - releasedPercent);
+  const currentWeekDays = stats.heatmapWeeks.at(-1)?.days ?? [];
+  const currentMonthLabel = new Intl.DateTimeFormat("en", { month: "long" }).format(new Date());
 
   const spawnSmashEffect = () => {
     const id = Date.now() + Math.floor(Math.random() * 10000);
@@ -580,6 +619,30 @@ export function ResetFlow({
                       <p className="text-xl font-semibold text-white/92">
                         {stats.awarenessStreak} day{stats.awarenessStreak === 1 ? "" : "s"}
                       </p>
+                      <div className="mt-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
+                        <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/38">{currentMonthLabel}</p>
+                        <div className="mt-4 grid grid-cols-7 gap-2">
+                          {currentWeekDays.map((day, index) => (
+                            <div key={day.day} className="flex flex-col items-center gap-2 text-center">
+                              <p className="text-[0.58rem] uppercase tracking-[0.14em] text-white/34">
+                                {compactWeekdayLabels[index]}
+                              </p>
+                              <div
+                                className="h-6 w-6 rounded-[7px] border sm:h-7 sm:w-7"
+                                style={getHeatmapCellStyle(day)}
+                                title={buildDayTitle(day)}
+                              />
+                              <p className="text-[0.6rem] text-white/36">
+                                {new Date(`${day.day}T12:00:00`).getDate()}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs leading-5 text-white/54">
+                        <span>Longest: {stats.longestAwarenessStreak} days</span>
+                        <span>Avg mood: {stats.totalSessions > 0 ? stats.averageMood.toFixed(1) : "0.0"}/5</span>
+                      </div>
                     </div>
                     <div className="flow-panel p-5">
                       <p className="eyebrow mb-3">Scale</p>

@@ -6,6 +6,7 @@ import type {
   DerivedStats,
   EmotionSession,
   FullSessionInput,
+  HeatmapWeek,
   MoodId,
   NeedId,
   Suggestion,
@@ -190,7 +191,7 @@ function findTopEntry(values: (string | undefined)[], resolver?: (value: string)
   return resolver ? resolver(top) : top;
 }
 
-function getWeeklyTrend(sessions: EmotionSession[]) {
+function mapSessionsByDay(sessions: EmotionSession[]) {
   const dayMap = new Map<string, EmotionSession[]>();
 
   sessions.forEach((session) => {
@@ -198,27 +199,34 @@ function getWeeklyTrend(sessions: EmotionSession[]) {
     dayMap.set(day, [...(dayMap.get(day) ?? []), session]);
   });
 
+  return dayMap;
+}
+
+function buildDaySummary(dayKey: string, sessionsForDay: EmotionSession[]): DaySummary {
+  const moods = sessionsForDay.map((session) => clampMood(session.moodBefore));
+  const fullSessionCount = sessionsForDay.filter((session) => session.sessionType === "full").length;
+  const averageMood = moods.length > 0 ? moods.reduce((total, mood) => total + mood, 0) / moods.length : 0;
+  const highestMood = moods.length > 0 ? Math.max(...moods) : 0;
+
+  return {
+    day: dayKey,
+    averageMood,
+    highestMood,
+    fullSessionCount,
+    calmDay: moods.length > 0 && highestMood <= 2 && fullSessionCount === 0,
+    completedSessions: sessionsForDay.length,
+  };
+}
+
+function getWeeklyTrend(sessions: EmotionSession[]) {
+  const dayMap = mapSessionsByDay(sessions);
   const days: DaySummary[] = [];
 
   for (let offset = 6; offset >= 0; offset -= 1) {
     const date = new Date();
     date.setDate(date.getDate() - offset);
     const dayKey = buildDayKey(date);
-    const sessionsForDay = dayMap.get(dayKey) ?? [];
-    const moods = sessionsForDay.map((session) => clampMood(session.moodBefore));
-    const fullSessionCount = sessionsForDay.filter((session) => session.sessionType === "full").length;
-    const averageMood =
-      moods.length > 0 ? moods.reduce((total, mood) => total + mood, 0) / moods.length : 0;
-    const highestMood = moods.length > 0 ? Math.max(...moods) : 0;
-
-    days.push({
-      day: dayKey,
-      averageMood,
-      highestMood,
-      fullSessionCount,
-      calmDay: moods.length > 0 && highestMood <= 2 && fullSessionCount === 0,
-      completedSessions: sessionsForDay.length,
-    });
+    days.push(buildDaySummary(dayKey, dayMap.get(dayKey) ?? []));
   }
 
   return days;
@@ -245,6 +253,67 @@ function calculateStreak(daysWithCheckIns: string[]) {
   }
 
   return streak;
+}
+
+function calculateLongestStreak(daysWithCheckIns: string[]) {
+  if (daysWithCheckIns.length === 0) {
+    return 0;
+  }
+
+  const ordered = [...new Set(daysWithCheckIns)].sort();
+  let longest = 1;
+  let current = 1;
+
+  for (let index = 1; index < ordered.length; index += 1) {
+    const previous = new Date(`${ordered[index - 1]}T12:00:00`);
+    const next = new Date(`${ordered[index]}T12:00:00`);
+    const diff = Math.round((next.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diff === 1) {
+      current += 1;
+      longest = Math.max(longest, current);
+      continue;
+    }
+
+    current = 1;
+  }
+
+  return longest;
+}
+
+function getStartOfWeek(dateLike: string | Date) {
+  const date = typeof dateLike === "string" ? new Date(`${dateLike}T12:00:00`) : new Date(dateLike);
+  const day = date.getDay();
+
+  date.setDate(date.getDate() - day);
+  date.setHours(12, 0, 0, 0);
+  return date;
+}
+
+function getHeatmapWeeks(sessions: EmotionSession[], weekCount = 12): HeatmapWeek[] {
+  const dayMap = mapSessionsByDay(sessions);
+  const currentWeekStart = getStartOfWeek(new Date());
+  const weeks: HeatmapWeek[] = [];
+
+  for (let weekOffset = weekCount - 1; weekOffset >= 0; weekOffset -= 1) {
+    const weekStart = new Date(currentWeekStart);
+    weekStart.setDate(currentWeekStart.getDate() - weekOffset * 7);
+    const days: DaySummary[] = [];
+
+    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + dayOffset);
+      const dayKey = buildDayKey(date);
+      days.push(buildDaySummary(dayKey, dayMap.get(dayKey) ?? []));
+    }
+
+    weeks.push({
+      weekStart: buildDayKey(weekStart),
+      days,
+    });
+  }
+
+  return weeks;
 }
 
 function getUnlockedBadges(sessions: EmotionSession[], weeklyTrend: DaySummary[], awarenessStreak: number) {
@@ -321,6 +390,7 @@ export function getDerivedStats(state: AppState): DerivedStats {
   const weeklyTrend = getWeeklyTrend(sessions);
   const uniqueDays = [...new Set(sessions.map((session) => buildDayKey(session.createdAt)))];
   const awarenessStreak = calculateStreak(uniqueDays);
+  const longestAwarenessStreak = calculateLongestStreak(uniqueDays);
   const averageMood =
     sessions.length > 0
       ? sessions.reduce((total, session) => total + clampMood(session.moodBefore), 0) / sessions.length
@@ -335,6 +405,7 @@ export function getDerivedStats(state: AppState): DerivedStats {
 
   return {
     awarenessStreak,
+    longestAwarenessStreak,
     calmDays: weeklyTrend.filter((day) => day.calmDay).length,
     totalSessions: sessions.length,
     fullSessions: fullSessions.length,
@@ -351,6 +422,7 @@ export function getDerivedStats(state: AppState): DerivedStats {
     ),
     unlockedBadges: getUnlockedBadges(sessions, weeklyTrend, awarenessStreak),
     weeklyTrend,
+    heatmapWeeks: getHeatmapWeeks(sessions),
     recentSessions: sessions.slice(0, 6),
   };
 }
@@ -410,4 +482,3 @@ export function getControlLabel(controlId?: string) {
 export function getMoodScaleSummary() {
   return moodOptions.map((mood) => `${mood.value}. ${mood.label}`).join("  ");
 }
-
