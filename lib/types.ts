@@ -61,6 +61,7 @@ export interface EmotionSession {
 
 export interface Preferences {
   locale: Locale;
+  displayName?: string;
   soundEnabled: boolean;
   scene: SceneId;
 }

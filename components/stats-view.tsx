@@ -111,9 +111,15 @@ export function StatsView() {
   const { appState, stats, updatePreferences } = useAppState();
   const locale = appState.preferences.locale;
   const copy = getCopy(locale);
+  const displayName = appState.preferences.displayName?.trim() ?? "";
   const moodOptions = getMoodOptions(locale);
   const weekdayLabels = getWeekdayLabels(locale, "compact");
   const strongestDay = [...stats.weeklyTrend].sort((left, right) => right.averageMood - left.averageMood)[0];
+  const title = displayName
+    ? locale === "th"
+      ? `${displayName} นี่คือรูปแบบอารมณ์ของคุณตอนนี้`
+      : `${displayName}, here is how your pattern is shifting.`
+    : copy.stats.title;
   const handleLocaleToggle = () => {
     updatePreferences({
       locale: locale === "en" ? "th" : "en",
@@ -125,7 +131,7 @@ export function StatsView() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="eyebrow mb-3">{copy.stats.progressTracking}</p>
-          <h1 className="text-4xl sm:text-5xl">{copy.stats.title}</h1>
+          <h1 className="text-4xl sm:text-5xl">{title}</h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -241,9 +247,6 @@ export function StatsView() {
               <p className="text-sm text-white/55">{copy.stats.mostUsedRitual}</p>
               <p className="mt-2 text-xl font-semibold text-white/92">
                 {stats.mostUsedTool ?? copy.stats.noFullRitual}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-white/58">
-                {copy.stats.mostUsedMethodLabel}: {stats.mostUsedMethod ?? copy.stats.noMethodData}
               </p>
             </div>
 

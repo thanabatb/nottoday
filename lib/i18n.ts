@@ -38,6 +38,11 @@ type TranslationTree = {
     withinControl: string;
     optionalNote: string;
     notePlaceholder: string;
+    namePromptTitle: string;
+    namePromptDescription: string;
+    namePlaceholder: string;
+    saveName: string;
+    maybeLater: string;
     backToReleaseRoom: string;
     viewSummary: string;
     viewPattern: string;
@@ -140,6 +145,11 @@ const translations: Record<Locale, TranslationTree> = {
       withinControl: "What part is within your control?",
       optionalNote: "Optional note",
       notePlaceholder: "What sits underneath the anger?",
+      namePromptTitle: "What should we call you?",
+      namePromptDescription: "We will keep it here so your reflections and patterns feel more personal.",
+      namePlaceholder: "Type your name",
+      saveName: "Save my name",
+      maybeLater: "Maybe later",
       backToReleaseRoom: "Back To Release Room",
       viewSummary: "View Summary",
       viewPattern: "View your pattern",
@@ -240,6 +250,11 @@ const translations: Record<Locale, TranslationTree> = {
       withinControl: "อะไรคือสิ่งที่ยังอยู่ในการควบคุมของคุณ?",
       optionalNote: "บันทึกเพิ่มเติม",
       notePlaceholder: "อะไรคือสิ่งที่ซ่อนอยู่ใต้ความโกรธนี้?",
+      namePromptTitle: "เราอยากเรียกคุณว่าอะไรดี?",
+      namePromptDescription: "เราจะจำชื่อนี้ไว้ในเครื่อง เพื่อให้การทบทวนและรูปแบบของคุณรู้สึกเป็นส่วนตัวมากขึ้น",
+      namePlaceholder: "พิมพ์ชื่อของคุณ",
+      saveName: "บันทึกชื่อ",
+      maybeLater: "ไว้ทีหลัง",
       backToReleaseRoom: "กลับไปที่ห้องระบาย",
       viewSummary: "ดูสรุป",
       viewPattern: "ดูรูปแบบของคุณ",

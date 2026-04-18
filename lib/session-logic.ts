@@ -20,6 +20,7 @@ export const defaultAppState: AppState = {
   sessions: [],
   preferences: {
     locale: "th",
+    displayName: "",
     soundEnabled: false,
     scene: "storm",
   },
@@ -195,6 +196,7 @@ export function restoreAppState(rawState: string | null): AppState {
         : [],
       preferences: {
         locale: parsed.preferences?.locale ?? defaultAppState.preferences.locale,
+        displayName: typeof parsed.preferences?.displayName === "string" ? parsed.preferences.displayName : defaultAppState.preferences.displayName,
         soundEnabled: parsed.preferences?.soundEnabled ?? defaultAppState.preferences.soundEnabled,
         scene: parsed.preferences?.scene ?? defaultAppState.preferences.scene,
       },

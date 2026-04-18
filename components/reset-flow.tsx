@@ -192,11 +192,15 @@ export function ResetFlow({
   const [smashEffects, setSmashEffects] = useState<SmashEffect[]>([]);
   const [hitCount, setHitCount] = useState(0);
   const [completedSession, setCompletedSession] = useState<EmotionSession | null>(null);
+  const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
   const [usesTouchInput, setUsesTouchInput] = useState(false);
   const locale = appState.preferences.locale;
   const copy = getCopy(locale);
   const needOptions = getNeedOptions(locale);
   const controlOptions = getControlOptions(locale);
+  const displayName = appState.preferences.displayName?.trim() ?? "";
+  const summaryDisplayName = displayName || nameDraft.trim();
   const soundEnabled = appState.preferences.soundEnabled;
   const targetHits = moodTargetHits[draft.moodBefore];
   const releasedPercent = Math.min(100, Math.round((hitCount / targetHits) * 100));
@@ -243,6 +247,8 @@ export function ResetFlow({
     setSmashEffects([]);
     setHitCount(0);
     setCompletedSession(null);
+    setNamePromptOpen(false);
+    setNameDraft("");
   };
 
   const closeAndReset = () => {
@@ -258,6 +264,30 @@ export function ResetFlow({
     updatePreferences({
       locale: locale === "en" ? "th" : "en",
     });
+  };
+  const continueToSummary = (session: EmotionSession) => {
+    setCompletedSession(session);
+
+    if (displayName) {
+      setStepIndex(3);
+      return;
+    }
+
+    setNameDraft("");
+    setNamePromptOpen(true);
+  };
+  const saveDisplayName = () => {
+    const trimmedName = nameDraft.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    updatePreferences({
+      displayName: trimmedName,
+    });
+    setNamePromptOpen(false);
+    setStepIndex(3);
   };
 
   useEffect(() => {
@@ -608,8 +638,7 @@ export function ResetFlow({
                         ...draft,
                         releaseHitCount: hitCount,
                       });
-                      setCompletedSession(session);
-                      setStepIndex(3);
+                      continueToSummary(session);
                     }}
                     type="button"
                   >
@@ -617,6 +646,71 @@ export function ResetFlow({
                     <ArrowRight className="size-4" />
                   </button>
                 </div>
+
+                {namePromptOpen ? (
+                  <motion.div
+                    animate={{ opacity: 1 }}
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/68 px-4 py-6 backdrop-blur-md"
+                    exit={{ opacity: 0 }}
+                    initial={{ opacity: 0 }}
+                  >
+                    <motion.div
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      className="surface relative w-full max-w-lg p-6 sm:p-8"
+                      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                      transition={transition}
+                    >
+                      <button
+                        className="flow-close absolute right-5 top-5"
+                        onClick={() => {
+                          setNamePromptOpen(false);
+                          setStepIndex(3);
+                        }}
+                        type="button"
+                      >
+                        <X className="size-4" />
+                      </button>
+
+                      <div className="pr-12">
+                        <p className="eyebrow mb-3">{copy.reset.end}</p>
+                        <h3 className="text-3xl sm:text-4xl">{copy.reset.namePromptTitle}</h3>
+                        <p className="mt-4 text-sm leading-7 text-white/66">{copy.reset.namePromptDescription}</p>
+                      </div>
+
+                      <div className="mt-6">
+                        <input
+                          autoFocus
+                          className="w-full rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                          onChange={(event) => setNameDraft(event.target.value)}
+                          placeholder={copy.reset.namePlaceholder}
+                          type="text"
+                          value={nameDraft}
+                        />
+                      </div>
+
+                      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                          className="rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/72 transition hover:border-white/22 hover:bg-white/[0.08]"
+                          onClick={() => {
+                            setNamePromptOpen(false);
+                            setStepIndex(3);
+                          }}
+                          type="button"
+                        >
+                          {copy.reset.maybeLater}
+                        </button>
+                        <button
+                          className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
+                          disabled={!nameDraft.trim()}
+                          onClick={saveDisplayName}
+                          type="button"
+                        >
+                          {copy.reset.saveName}
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                ) : null}
               </div>
           ) : null}
 
@@ -627,7 +721,7 @@ export function ResetFlow({
                     <p className="eyebrow mb-3">{copy.reset.end}</p>
                     <h2 className="text-5xl leading-none sm:text-6xl">{copy.reset.interruptedTitle}</h2>
                     <p className="mt-4 max-w-2xl text-base leading-8 text-white/68">
-                      {buildCompletionLine(completedSession, locale)}
+                      {summaryDisplayName ? `${summaryDisplayName}, ${buildCompletionLine(completedSession, locale)}` : buildCompletionLine(completedSession, locale)}
                     </p>
                   </div>
 
