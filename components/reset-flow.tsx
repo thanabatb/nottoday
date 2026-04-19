@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ShieldPlus, Sparkles, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { LocaleToggle } from "@/components/locale-toggle";
 import { getCopy, getIntlLocale, getWeekdayLabels } from "@/lib/i18n";
@@ -27,18 +27,42 @@ type SmashEffect = {
   rotation: number;
   size: number;
 };
+
+function getFocusableElements(container: HTMLElement | null) {
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true");
+}
+
 function MoodPicker({
+  tone = "default",
   locale,
   selected,
   onSelect,
   compact = false,
 }: {
+  tone?: "default" | "reflective";
   locale: "en" | "th";
   selected: MoodId | null;
   onSelect: (moodId: MoodId) => void;
   compact?: boolean;
 }) {
   const moodOptions = getMoodOptions(locale);
+  const compactSelectedClass =
+    tone === "reflective"
+      ? "border-[#d8b180]/85 bg-[rgba(255,248,239,0.42)] shadow-[0_10px_24px_rgba(160,124,80,0.12)]"
+      : "border-white/28 bg-white/12";
+  const compactDefaultClass =
+    tone === "reflective"
+      ? "border-white/28 bg-[rgba(255,255,255,0.18)] hover:border-white/40 hover:bg-[rgba(255,255,255,0.24)]"
+      : "border-white/10 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.06]";
+  const compactMetaClass = tone === "reflective" ? "text-[#6a5b4a]/78" : "text-white/45";
 
   return (
     <div className={`grid gap-3 ${compact ? "sm:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-5"}`}>
@@ -47,8 +71,12 @@ function MoodPicker({
           key={mood.id}
           className={`text-left transition ${
             selected === mood.id
-              ? "border-white/28 bg-white/12"
-              : "border-white/10 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.06]"
+              ? compact && tone === "reflective"
+                ? compactSelectedClass
+                : "border-white/28 bg-white/12"
+              : compact && tone === "reflective"
+                ? compactDefaultClass
+                : "border-white/10 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.06]"
           } ${
             compact
               ? "rounded-[22px] border px-4 py-4"
@@ -60,7 +88,7 @@ function MoodPicker({
             boxShadow: selected === mood.id ? `0 0 0 1px ${mood.glow} inset` : undefined,
           }}
         >
-          <p className="text-xs uppercase tracking-[0.22em] text-white/45">{mood.value}/5</p>
+          <p className={`text-xs uppercase tracking-[0.22em] ${compact ? compactMetaClass : "text-white/45"}`}>{mood.value}/5</p>
           <p className="mt-3 text-lg font-semibold" style={{ color: mood.accent }}>
             {mood.label}
           </p>
@@ -106,11 +134,15 @@ function SoundToggleButton({
 }
 
 function StepHeader({
+  descriptionId,
   step,
+  titleId,
   title,
   description,
 }: {
+  descriptionId?: string;
   step: string;
+  titleId?: string;
   title: string;
   description: string;
 }) {
@@ -119,8 +151,8 @@ function StepHeader({
       <div className="inline-flex rounded-full border border-white/14 bg-white/[0.04] px-4 py-2 text-[0.68rem] uppercase tracking-[0.28em] text-white/58">
         {step}
       </div>
-      <h2 className="mt-5 text-4xl leading-none sm:text-5xl">{title}</h2>
-      <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/66 lg:mx-0">{description}</p>
+      <h2 className="mt-5 text-4xl leading-none sm:text-5xl" id={titleId}>{title}</h2>
+      <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/66 lg:mx-0" id={descriptionId}>{description}</p>
     </div>
   );
 }
@@ -186,6 +218,10 @@ export function ResetFlow({
   onSoundtrackChange: (track: "main" | "ending") => void;
 }) {
   const { appState, saveResetSession, stats, updatePreferences } = useAppState();
+  const moodDialogRef = useRef<HTMLDivElement | null>(null);
+  const stageDialogRef = useRef<HTMLDivElement | null>(null);
+  const nameDialogRef = useRef<HTMLDivElement | null>(null);
+  const lastActiveElementRef = useRef<HTMLElement | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<FullSessionInput>(initialDraft);
   const [pillowBroken, setPillowBroken] = useState(false);
@@ -209,6 +245,25 @@ export function ResetFlow({
   const currentMonthLabel = new Intl.DateTimeFormat(getIntlLocale(locale), { month: "long" }).format(new Date());
   const compactWeekdayLabels = getWeekdayLabels(locale, "compact");
   const completionSuggestion = resolveSuggestion(completedSession?.suggestion, locale);
+  const activeDialogRef = namePromptOpen ? nameDialogRef : stepIndex === 0 ? moodDialogRef : stageDialogRef;
+  const dialogTitleId = namePromptOpen
+    ? "name-dialog-title"
+    : stepIndex === 0
+      ? "mood-dialog-title"
+      : stepIndex === 2
+        ? "reflection-dialog-title"
+        : stepIndex === 3
+          ? "summary-dialog-title"
+          : "release-dialog-title";
+  const dialogDescriptionId = namePromptOpen
+    ? "name-dialog-description"
+    : stepIndex === 0
+      ? "mood-dialog-description"
+      : stepIndex === 2
+        ? "reflection-dialog-description"
+        : stepIndex === 3
+          ? "summary-dialog-description"
+          : "release-dialog-description";
 
   const spawnSmashEffect = () => {
     const id = Date.now() + Math.floor(Math.random() * 10000);
@@ -240,7 +295,7 @@ export function ResetFlow({
     setPillowBroken(false);
   };
 
-  const resetFlowState = () => {
+  const resetFlowState = useCallback(() => {
     setStepIndex(0);
     setDraft(initialDraft);
     setPillowBroken(false);
@@ -249,12 +304,12 @@ export function ResetFlow({
     setCompletedSession(null);
     setNamePromptOpen(false);
     setNameDraft("");
-  };
+  }, []);
 
-  const closeAndReset = () => {
+  const closeAndReset = useCallback(() => {
     resetFlowState();
     onClose();
-  };
+  }, [onClose, resetFlowState]);
   const handleSoundToggle = () => {
     updatePreferences({
       soundEnabled: !soundEnabled,
@@ -316,6 +371,94 @@ export function ResetFlow({
     };
   }, []);
 
+  useEffect(() => {
+    if (!open || typeof document === "undefined") {
+      return;
+    }
+
+    lastActiveElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    return () => {
+      lastActiveElementRef.current?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const container = activeDialogRef.current;
+    if (!container) {
+      return;
+    }
+
+    const focusableElements = getFocusableElements(container);
+    const firstFocusable = focusableElements[0];
+    window.requestAnimationFrame(() => {
+      (firstFocusable ?? container).focus();
+    });
+  }, [activeDialogRef, namePromptOpen, open, stepIndex]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const container = activeDialogRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+
+        if (namePromptOpen) {
+          setNamePromptOpen(false);
+          setStepIndex(3);
+          return;
+        }
+
+        closeAndReset();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(container);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        container.focus();
+        return;
+      }
+
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey) {
+        if (activeElement === firstFocusable || activeElement === container) {
+          event.preventDefault();
+          lastFocusable.focus();
+        }
+        return;
+      }
+
+      if (activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable.focus();
+      }
+    };
+
+    container.addEventListener("keydown", handleKeyDown);
+    return () => {
+      container.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeDialogRef, closeAndReset, namePromptOpen, open]);
+
   if (!open) {
     return null;
   }
@@ -335,10 +478,16 @@ export function ResetFlow({
               className="surface relative max-h-[calc(100vh-3rem)] w-full overflow-x-hidden overflow-y-auto sm:max-h-none"
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              aria-describedby={dialogDescriptionId}
+              aria-labelledby={dialogTitleId}
+              aria-modal="true"
+              ref={moodDialogRef}
+              role="dialog"
+              tabIndex={-1}
               transition={transition}
             >
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-              <button className="flow-close absolute right-5 top-5" onClick={closeAndReset} type="button">
+              <button aria-label={copy.common.close} className="flow-close absolute right-5 top-5" onClick={closeAndReset} type="button">
                 <X className="size-4" />
               </button>
               <LocaleToggle className="locale-toggle-modal" locale={locale} onToggle={handleLocaleToggle} />
@@ -364,7 +513,9 @@ export function ResetFlow({
                 <div className="text-center">
                   <StepHeader
                     description={copy.reset.moodDescription}
+                    descriptionId={dialogDescriptionId}
                     step={copy.reset.mood}
+                    titleId={dialogTitleId}
                     title={copy.reset.moodQuestion}
                   />
                   <div className="mx-auto mb-6 w-fit rounded-full border border-white/12 bg-white/[0.05] px-5 py-3 text-sm leading-7 text-white/66">
@@ -399,12 +550,20 @@ export function ResetFlow({
       ) : (
         <motion.div
           animate={{ opacity: 1 }}
-          className="flow-screen z-50"
+          className={`flow-screen z-50 ${stepIndex >= 2 ? "flow-screen-reflective" : ""}`.trim()}
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
           style={stepIndex >= 2 ? { backgroundImage: "url('/illustrations/reflect_bg.png')" } : undefined}
         >
-          <div className="relative mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-8">
+          <div
+            aria-describedby={dialogDescriptionId}
+            aria-labelledby={dialogTitleId}
+            aria-modal="true"
+            className="relative z-[1] mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-8"
+            ref={stageDialogRef}
+            role="dialog"
+            tabIndex={-1}
+          >
           <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
           <SoundToggleButton
             offLabel={copy.common.soundOff}
@@ -414,6 +573,10 @@ export function ResetFlow({
           />
           {stepIndex === 1 ? (
               <div className="relative min-h-[calc(100vh-3rem)] sm:min-h-[86vh]">
+                <div className="sr-only">
+                  <h2 id={dialogTitleId}>{copy.reset.releaseStatus}</h2>
+                  <p id={dialogDescriptionId}>{usesTouchInput ? copy.reset.tapPillow : copy.reset.clickPillow}</p>
+                </div>
                 <button
                   className="absolute left-0 top-0 z-10 rounded-full border border-white/12 bg-black/28 px-5 py-3 text-sm font-medium text-white/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-md transition hover:border-white/22 hover:bg-black/36"
                   onClick={closeAndReset}
@@ -539,76 +702,79 @@ export function ResetFlow({
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
                     <p className="eyebrow mb-3">{copy.reset.reflection}</p>
-                    <h2 className="text-5xl leading-none sm:text-6xl">{copy.reset.reflectionTitle}</h2>
-                    <p className="mt-4 max-w-2xl text-base leading-8 text-white/68">
+                    <h2 className="reflective-stage-title text-5xl leading-none sm:text-6xl" id={dialogTitleId}>
+                      {copy.reset.reflectionTitle}
+                    </h2>
+                    <p className="reflective-stage-subtitle mt-4 max-w-2xl text-base leading-8" id={dialogDescriptionId}>
                       {copy.reset.reflectionDescription}
                     </p>
                   </div>
 
-                  <button className="flow-close" onClick={closeAndReset} type="button">
+                  <button aria-label={copy.common.close} className="flow-close" onClick={closeAndReset} type="button">
                     <X className="size-4" />
                   </button>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.intenseNow}</p>
+                  <div className="flow-panel reflective-panel reflective-panel-strong p-5">
+                    <p className="mb-3 text-sm font-medium text-[#43362a]/88">{copy.reset.intenseNow}</p>
                     <MoodPicker
                       compact
                       onSelect={(moodAfter) => setDraft((current) => ({ ...current, moodAfter }))}
                       locale={locale}
                       selected={draft.moodAfter}
+                      tone="reflective"
                     />
                   </div>
 
-                  <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.needMost}</p>
+                  <div className="flow-panel reflective-panel p-5">
+                    <p className="mb-3 text-sm font-medium text-[#43362a]/88">{copy.reset.needMost}</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       {needOptions.map((option) => (
                         <button
                           key={option.id}
                           className={`rounded-[20px] border p-4 text-left transition ${
                             draft.needId === option.id
-                              ? "border-white/24 bg-white/10"
-                              : "border-white/8 bg-white/[0.03] hover:border-white/18"
+                              ? "border-[#b89467]/70 bg-white/32"
+                              : "border-white/20 bg-white/14 hover:border-white/32 hover:bg-white/20"
                           }`}
                           onClick={() => setDraft((current) => ({ ...current, needId: option.id }))}
                           type="button"
                         >
-                          <p className="text-base font-semibold text-white/92">{option.label}</p>
-                          <p className="mt-2 text-sm leading-6 text-white/60">{option.description}</p>
+                          <p className="text-base font-semibold text-[#2d241a]/92">{option.label}</p>
+                          <p className="mt-2 text-sm leading-6 text-[#4b3f31]/80">{option.description}</p>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="flow-panel p-5">
-                    <p className="mb-3 text-sm font-medium text-white/74">{copy.reset.withinControl}</p>
+                  <div className="flow-panel reflective-panel p-5">
+                    <p className="mb-3 text-sm font-medium text-[#43362a]/88">{copy.reset.withinControl}</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       {controlOptions.map((option) => (
                         <button
                           key={option.id}
                           className={`rounded-[20px] border p-4 text-left transition ${
                             draft.controlId === option.id
-                              ? "border-white/24 bg-white/10"
-                              : "border-white/8 bg-white/[0.03] hover:border-white/18"
+                              ? "border-[#b89467]/70 bg-white/32"
+                              : "border-white/20 bg-white/14 hover:border-white/32 hover:bg-white/20"
                           }`}
                           onClick={() => setDraft((current) => ({ ...current, controlId: option.id }))}
                           type="button"
                         >
-                          <p className="text-base font-semibold text-white/92">{option.label}</p>
-                          <p className="mt-2 text-sm leading-6 text-white/60">{option.description}</p>
+                          <p className="text-base font-semibold text-[#2d241a]/92">{option.label}</p>
+                          <p className="mt-2 text-sm leading-6 text-[#4b3f31]/80">{option.description}</p>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="flow-panel p-5">
-                    <label className="mb-3 block text-sm font-medium text-white/74" htmlFor="session-note">
+                  <div className="flow-panel reflective-panel p-5">
+                    <label className="mb-3 block text-sm font-medium text-[#43362a]/88" htmlFor="session-note">
                       {copy.reset.optionalNote}
                     </label>
                     <textarea
-                      className="min-h-28 w-full rounded-[20px] border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/20"
+                      className="min-h-28 w-full rounded-[20px] border border-white/24 bg-white/14 px-4 py-4 text-sm text-[#2d241a] outline-none placeholder:text-[#6a5b4a]/58 focus:border-[#b89467]/70"
                       id="session-note"
                       onChange={(event) =>
                         setDraft((current) => ({
@@ -624,7 +790,7 @@ export function ResetFlow({
 
                 <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
-                    className="rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/72 transition hover:border-white/22 hover:bg-white/[0.08]"
+                    className="reflective-secondary-button rounded-full px-5 py-3 text-sm font-medium transition"
                     onClick={() => setStepIndex(1)}
                     type="button"
                   >
@@ -632,7 +798,7 @@ export function ResetFlow({
                   </button>
 
                   <button
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
+                    className="reflective-primary-button inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
                     onClick={() => {
                       const session = saveResetSession({
                         ...draft,
@@ -658,9 +824,16 @@ export function ResetFlow({
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       className="surface relative w-full max-w-lg p-6 sm:p-8"
                       initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                      aria-describedby={dialogDescriptionId}
+                      aria-labelledby={dialogTitleId}
+                      aria-modal="true"
+                      ref={nameDialogRef}
+                      role="dialog"
+                      tabIndex={-1}
                       transition={transition}
                     >
                       <button
+                        aria-label={copy.common.close}
                         className="flow-close absolute right-5 top-5"
                         onClick={() => {
                           setNamePromptOpen(false);
@@ -673,8 +846,8 @@ export function ResetFlow({
 
                       <div className="pr-12">
                         <p className="eyebrow mb-3">{copy.reset.end}</p>
-                        <h3 className="text-3xl sm:text-4xl">{copy.reset.namePromptTitle}</h3>
-                        <p className="mt-4 text-sm leading-7 text-white/66">{copy.reset.namePromptDescription}</p>
+                        <h3 className="text-3xl sm:text-4xl" id={dialogTitleId}>{copy.reset.namePromptTitle}</h3>
+                        <p className="mt-4 text-sm leading-7 text-white/72" id={dialogDescriptionId}>{copy.reset.namePromptDescription}</p>
                       </div>
 
                       <div className="mt-6">
@@ -719,86 +892,89 @@ export function ResetFlow({
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
                     <p className="eyebrow mb-3">{copy.reset.end}</p>
-                    <h2 className="text-5xl leading-none sm:text-6xl">{copy.reset.interruptedTitle}</h2>
-                    <p className="mt-4 max-w-2xl text-base leading-8 text-white/68">
+                    <h2 className="reflective-stage-title text-5xl leading-none sm:text-6xl" id={dialogTitleId}>
+                      {copy.reset.interruptedTitle}
+                    </h2>
+                    <p className="reflective-stage-subtitle mt-4 max-w-2xl text-base leading-8" id={dialogDescriptionId}>
                       {summaryDisplayName ? `${summaryDisplayName}, ${buildCompletionLine(completedSession, locale)}` : buildCompletionLine(completedSession, locale)}
                     </p>
                   </div>
 
-                  <button className="flow-close" onClick={closeAndReset} type="button">
+                  <button aria-label={copy.common.close} className="flow-close" onClick={closeAndReset} type="button">
                     <X className="size-4" />
                   </button>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="flow-panel bg-[linear-gradient(180deg,rgba(145,244,196,0.16),rgba(255,255,255,0.04))] p-6">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/20 px-3 py-1 text-xs uppercase tracking-[0.24em] text-emerald-100/75">
+                <div className="summary-screen grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                  <div className="flow-panel reflective-panel summary-panel summary-panel-soft p-6">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#b5a182]/45 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.24em] text-[#5b4c3c]">
                       <Sparkles className="size-4" />
                       {copy.reset.suggestedNextStep}
                     </div>
-                    <h3 className="mt-4 text-3xl">{completionSuggestion?.title}</h3>
-                    <p className="mt-4 text-sm leading-7 text-white/70">{completionSuggestion?.description}</p>
-                    <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-3 text-sm font-semibold text-slate-950">
+                    <h3 className="mt-4 text-3xl text-[#2d241a]">{completionSuggestion?.title}</h3>
+                    <p className="mt-4 text-sm leading-7 text-[#4b3f31]/88">{completionSuggestion?.description}</p>
+                    <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#fff1de]/88 px-4 py-3 text-sm font-semibold text-[#2f1c0f]">
                       <ShieldPlus className="size-4" />
                       {completionSuggestion?.actionLabel}
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flow-panel p-5">
+                    <div className="flow-panel reflective-panel summary-panel p-5">
                       <p className="eyebrow mb-3">{copy.reset.moodShift}</p>
-                      <p className="text-xl font-semibold text-white/92">
+                      <p className="text-xl font-semibold text-[#2d241a]">
                         {getMoodById(completedSession.moodBefore, locale).label} {copy.reset.moodShiftConnector}{" "}
                         {getMoodById(completedSession.moodAfter, locale).label}
                       </p>
                     </div>
-                    <div className="flow-panel p-5">
+                    <div className="flow-panel reflective-panel summary-panel p-5">
                       <p className="eyebrow mb-3">{copy.reset.awarenessStreak}</p>
-                      <p className="text-xl font-semibold text-white/92">
+                      <p className="text-xl font-semibold text-[#2d241a]">
                         {stats.awarenessStreak} {stats.awarenessStreak === 1 ? copy.common.day : copy.common.days}
                       </p>
-                      <div className="mt-4 rounded-[22px] border border-white/8 bg-white/[0.03] p-4">
-                        <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/38">{currentMonthLabel}</p>
+                      <div className="mt-4 rounded-[22px] border border-white/20 bg-white/10 p-4">
+                        <p className="text-[0.68rem] uppercase tracking-[0.22em] text-[#5e4f3f]">{currentMonthLabel}</p>
                         <div className="mt-4 grid grid-cols-7 gap-2">
                           {currentWeekDays.map((day, index) => (
                             <div key={day.day} className="flex flex-col items-center gap-2 text-center">
-                              <p className="text-[0.58rem] uppercase tracking-[0.14em] text-white/34">
+                              <p className="text-[0.58rem] uppercase tracking-[0.14em] text-[#6a5b4a]">
                                 {compactWeekdayLabels[index]}
                               </p>
                               <div
                                 className="h-6 w-6 rounded-[7px] border sm:h-7 sm:w-7"
+                                aria-label={buildDayTitle(day, locale)}
                                 style={getHeatmapCellStyle(day, locale)}
                                 title={buildDayTitle(day, locale)}
                               />
-                              <p className="text-[0.6rem] text-white/36">
+                              <p className="text-[0.6rem] text-[#6a5b4a]">
                                 {new Date(`${day.day}T12:00:00`).getDate()}
                               </p>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-3 text-xs leading-5 text-white/54">
+                      <div className="mt-3 flex flex-wrap gap-3 text-xs leading-5 text-[#5e4f3f]">
                         <span>{copy.reset.longest}: {stats.longestAwarenessStreak} {copy.common.days}</span>
                         <span>{copy.reset.averageMood}: {stats.totalSessions > 0 ? formatMetric(stats.averageMood) : "0.0"}/5</span>
                       </div>
                     </div>
-                    <div className="flow-panel p-5">
+                    <div className="flow-panel reflective-panel summary-panel p-5">
                       <p className="eyebrow mb-3">{copy.reset.scale}</p>
-                      <p className="text-sm leading-7 text-white/65">{getMoodScaleSummary(locale)}</p>
+                      <p className="text-sm leading-7 text-[#4b3f31]/88">{getMoodScaleSummary(locale)}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   <Link
-                    className="inline-flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
+                    className="reflective-primary-button inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-[#2f1c0f] transition hover:-translate-y-0.5"
                     href="/stats"
                     onClick={closeAndReset}
                   >
                     {copy.reset.viewPattern}
                   </Link>
                   <button
-                    className="rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/72 transition hover:border-white/22 hover:bg-white/[0.08]"
+                    className="reflective-secondary-button rounded-full px-6 py-3 text-sm font-medium text-[#4b3f31] transition"
                     onClick={closeAndReset}
                     type="button"
                   >
