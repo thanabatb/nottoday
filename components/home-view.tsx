@@ -18,6 +18,7 @@ export function HomeView() {
   const soundEnabled = appState.preferences.soundEnabled;
   const soundtrackSrc = soundtrack === "ending" ? "/audio/ending.wav" : "/audio/main.wav";
   const copy = getCopy(locale);
+  const landingKicker = locale === "th" ? "พื้นที่ปลอดภัย" : "Safe Space";
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -80,9 +81,17 @@ export function HomeView() {
         <span className="sr-only">{soundEnabled ? copy.common.soundOn : copy.common.soundOff}</span>
       </button>
 
-      <button className="start-button" onClick={() => setResetOpen(true)} type="button">
-        {copy.home.enterRoom}
-      </button>
+      <section className="landing-intro" aria-label={copy.home.welcomeTitle}>
+        <div className="landing-copy">
+          <p className="landing-kicker">{landingKicker}</p>
+          <h1 className="landing-title">{copy.home.welcomeTitle}</h1>
+          <p className="landing-subtitle">{copy.home.welcomeSubtitle}</p>
+        </div>
+
+        <button className="start-button landing-start-button" onClick={() => setResetOpen(true)} type="button">
+          {copy.home.enterRoom}
+        </button>
+      </section>
 
       <ResetFlow
         onClose={() => {

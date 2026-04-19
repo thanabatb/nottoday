@@ -14,6 +14,8 @@ type TranslationTree = {
     switchLanguage: string;
   };
   home: {
+    welcomeTitle: string;
+    welcomeSubtitle: string;
     enterRoom: string;
   };
   reset: {
@@ -121,6 +123,8 @@ const translations: Record<Locale, TranslationTree> = {
       switchLanguage: "Switch language",
     },
     home: {
+      welcomeTitle: "Welcome to your safe space",
+      welcomeSubtitle: "Are you ready to let it all go here?",
       enterRoom: "Enter Room",
     },
     reset: {
@@ -226,6 +230,8 @@ const translations: Record<Locale, TranslationTree> = {
       switchLanguage: "สลับภาษา",
     },
     home: {
+      welcomeTitle: "ยินดีต้อนรับสู่พื้นที่ปลอดภัยของคุณ",
+      welcomeSubtitle: "พร้อมจะปล่อยทุกอย่างไว้ตรงนี้ไหม?",
       enterRoom: "เข้าห้อง",
     },
     reset: {

@@ -564,8 +564,9 @@ export function ResetFlow({
             role="dialog"
             tabIndex={-1}
           >
-          <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
+          <LocaleToggle className={stepIndex >= 2 ? "reflective-floating-control" : ""} locale={locale} onToggle={handleLocaleToggle} />
           <SoundToggleButton
+            className={stepIndex >= 2 ? "reflective-floating-control" : ""}
             offLabel={copy.common.soundOff}
             onLabel={copy.common.soundOn}
             onToggle={handleSoundToggle}
@@ -701,7 +702,7 @@ export function ResetFlow({
               <div className="mx-auto max-w-5xl">
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
-                    <p className="eyebrow mb-3">{copy.reset.reflection}</p>
+                    <p className="eyebrow reflective-stage-kicker mb-3">{copy.reset.reflection}</p>
                     <h2 className="reflective-stage-title text-5xl leading-none sm:text-6xl" id={dialogTitleId}>
                       {copy.reset.reflectionTitle}
                     </h2>
@@ -710,7 +711,12 @@ export function ResetFlow({
                     </p>
                   </div>
 
-                  <button aria-label={copy.common.close} className="flow-close" onClick={closeAndReset} type="button">
+                  <button
+                    aria-label={copy.common.close}
+                    className="flow-close reflective-floating-control"
+                    onClick={closeAndReset}
+                    type="button"
+                  >
                     <X className="size-4" />
                   </button>
                 </div>
@@ -891,7 +897,7 @@ export function ResetFlow({
               <div className="mx-auto max-w-5xl">
                 <div className="mb-8 flex items-start justify-between gap-6">
                   <div>
-                    <p className="eyebrow mb-3">{copy.reset.end}</p>
+                    <p className="eyebrow reflective-stage-kicker mb-3">{copy.reset.end}</p>
                     <h2 className="reflective-stage-title text-5xl leading-none sm:text-6xl" id={dialogTitleId}>
                       {copy.reset.interruptedTitle}
                     </h2>
@@ -900,7 +906,12 @@ export function ResetFlow({
                     </p>
                   </div>
 
-                  <button aria-label={copy.common.close} className="flow-close" onClick={closeAndReset} type="button">
+                  <button
+                    aria-label={copy.common.close}
+                    className="flow-close reflective-floating-control"
+                    onClick={closeAndReset}
+                    type="button"
+                  >
                     <X className="size-4" />
                   </button>
                 </div>
