@@ -472,6 +472,17 @@ export function ResetFlow({
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
         >
+          <div className="floating-control-dock">
+            <LocaleToggle className="locale-toggle-modal" locale={locale} onToggle={handleLocaleToggle} />
+            <SoundToggleButton
+              className="sound-toggle-modal"
+              offLabel={copy.common.soundOff}
+              onLabel={copy.common.soundOn}
+              onToggle={handleSoundToggle}
+              soundEnabled={soundEnabled}
+            />
+          </div>
+
           <div className="mx-auto flex min-h-full max-w-4xl items-start justify-center py-12 sm:items-center sm:py-0">
             <motion.div
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -490,14 +501,6 @@ export function ResetFlow({
               <button aria-label={copy.common.close} className="flow-close absolute right-5 top-5" onClick={closeAndReset} type="button">
                 <X className="size-4" />
               </button>
-              <LocaleToggle className="locale-toggle-modal" locale={locale} onToggle={handleLocaleToggle} />
-              <SoundToggleButton
-                className="sound-toggle-modal"
-                offLabel={copy.common.soundOff}
-                onLabel={copy.common.soundOn}
-                onToggle={handleSoundToggle}
-                soundEnabled={soundEnabled}
-              />
 
               <div className="border-b border-white/8 px-6 py-5 sm:px-8">
                 <p className="eyebrow mb-2">{copy.reset.setupStage}</p>
@@ -555,6 +558,17 @@ export function ResetFlow({
           initial={{ opacity: 0 }}
           style={stepIndex >= 2 ? { backgroundImage: "url('/illustrations/reflect_bg.png')" } : undefined}
         >
+          <div className="floating-control-dock">
+            <LocaleToggle className={stepIndex >= 2 ? "reflective-floating-control" : ""} locale={locale} onToggle={handleLocaleToggle} />
+            <SoundToggleButton
+              className={stepIndex >= 2 ? "reflective-floating-control" : ""}
+              offLabel={copy.common.soundOff}
+              onLabel={copy.common.soundOn}
+              onToggle={handleSoundToggle}
+              soundEnabled={soundEnabled}
+            />
+          </div>
+
           <div
             aria-describedby={dialogDescriptionId}
             aria-labelledby={dialogTitleId}
@@ -564,14 +578,6 @@ export function ResetFlow({
             role="dialog"
             tabIndex={-1}
           >
-          <LocaleToggle className={stepIndex >= 2 ? "reflective-floating-control" : ""} locale={locale} onToggle={handleLocaleToggle} />
-          <SoundToggleButton
-            className={stepIndex >= 2 ? "reflective-floating-control" : ""}
-            offLabel={copy.common.soundOff}
-            onLabel={copy.common.soundOn}
-            onToggle={handleSoundToggle}
-            soundEnabled={soundEnabled}
-          />
           {stepIndex === 1 ? (
               <div className="relative min-h-[calc(100vh-3rem)] sm:min-h-[86vh]">
                 <div className="sr-only">

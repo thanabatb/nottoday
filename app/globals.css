@@ -559,10 +559,28 @@ h4 {
     outline-offset: 4px;
   }
 
+  .floating-control-dock {
+    position: fixed;
+    right: 1.5rem;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .floating-control-dock .sound-toggle,
+  .floating-control-dock .locale-toggle {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    margin: 0;
+  }
+
   .locale-toggle {
     position: absolute;
-    top: 1.5rem;
-    left: 1.5rem;
     z-index: 5;
     display: inline-flex;
     align-items: center;
@@ -592,16 +610,11 @@ h4 {
   }
 
   .sound-toggle-modal {
-    top: 1.25rem;
-    bottom: auto;
-    left: 1.25rem;
-    right: auto;
     z-index: 5;
   }
 
   .locale-toggle-modal {
-    top: 1.25rem;
-    left: 5.75rem;
+    z-index: 5;
   }
 
   @media (max-width: 640px) {
@@ -631,30 +644,20 @@ h4 {
       line-height: 1.6;
     }
 
+    .floating-control-dock {
+      right: 1rem;
+      bottom: calc(1rem + env(safe-area-inset-bottom));
+      gap: 0.65rem;
+    }
+
     .sound-toggle {
       width: 3.5rem;
       height: 3.5rem;
-      bottom: 1rem;
-      right: 1rem;
-    }
-
-    .sound-toggle-modal {
-      top: 1rem;
-      left: 1rem;
-      bottom: auto;
-      right: auto;
     }
 
     .locale-toggle {
-      top: 1rem;
-      left: 1rem;
       padding: 0.75rem 0.9rem;
       font-size: 0.8rem;
-    }
-
-    .locale-toggle-modal {
-      top: 1rem;
-      left: 5rem;
     }
   }
 

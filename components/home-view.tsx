@@ -61,25 +61,27 @@ export function HomeView() {
     <main className="landing-screen" style={{ backgroundImage: landingBackdrop }}>
       <audio ref={audioRef} loop preload="auto" src={soundtrackSrc} />
 
-      <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
+      <div className="floating-control-dock">
+        <LocaleToggle locale={locale} onToggle={handleLocaleToggle} />
 
-      <button
-        aria-label={soundEnabled ? copy.common.soundOff : copy.common.soundOn}
-        className="sound-toggle"
-        data-enabled={soundEnabled}
-        onClick={handleSoundToggle}
-        type="button"
-      >
-        <Image
-          alt=""
-          aria-hidden="true"
-          className="sound-toggle-icon"
-          height={24}
-          src="/illustrations/volume-high.svg"
-          width={24}
-        />
-        <span className="sr-only">{soundEnabled ? copy.common.soundOn : copy.common.soundOff}</span>
-      </button>
+        <button
+          aria-label={soundEnabled ? copy.common.soundOff : copy.common.soundOn}
+          className="sound-toggle"
+          data-enabled={soundEnabled}
+          onClick={handleSoundToggle}
+          type="button"
+        >
+          <Image
+            alt=""
+            aria-hidden="true"
+            className="sound-toggle-icon"
+            height={24}
+            src="/illustrations/volume-high.svg"
+            width={24}
+          />
+          <span className="sr-only">{soundEnabled ? copy.common.soundOn : copy.common.soundOff}</span>
+        </button>
+      </div>
 
       <section className="landing-intro" aria-label={copy.home.welcomeTitle}>
         <div className="landing-copy">
