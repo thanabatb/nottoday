@@ -27,6 +27,7 @@ type SmashEffect = {
   rotation: number;
   size: number;
 };
+type TransitionPhase = "mood" | "release" | "reflection" | "summary";
 
 function getFocusableElements(container: HTMLElement | null) {
   if (!container) {

@@ -58,6 +58,15 @@ type TranslationTree = {
     currentMonth: string;
     longest: string;
     averageMood: string;
+    transitionKicker: string;
+    loadingMoodTitle: string;
+    loadingMoodDescription: string;
+    loadingReleaseTitle: string;
+    loadingReleaseDescription: string;
+    loadingReflectionTitle: string;
+    loadingReflectionDescription: string;
+    loadingSummaryTitle: string;
+    loadingSummaryDescription: string;
   };
   stats: {
     progressTracking: string;
@@ -167,6 +176,15 @@ const translations: Record<Locale, TranslationTree> = {
       currentMonth: "Current month",
       longest: "Longest",
       averageMood: "Avg mood",
+      transitionKicker: "Transition",
+      loadingMoodTitle: "Making space for your check-in",
+      loadingMoodDescription: "A softer pause before we begin.",
+      loadingReleaseTitle: "Opening the release room",
+      loadingReleaseDescription: "Taking you gently into the next step.",
+      loadingReflectionTitle: "Settling the room",
+      loadingReflectionDescription: "Let the intensity fall before you reflect.",
+      loadingSummaryTitle: "Gathering what shifted",
+      loadingSummaryDescription: "Holding the moment before your summary appears.",
     },
     stats: {
       progressTracking: "Progress Tracking",
@@ -274,6 +292,15 @@ const translations: Record<Locale, TranslationTree> = {
       currentMonth: "เดือนปัจจุบัน",
       longest: "ยาวที่สุด",
       averageMood: "อารมณ์เฉลี่ย",
+      transitionKicker: "กำลังเปลี่ยนผ่าน",
+      loadingMoodTitle: "กำลังเปิดพื้นที่ให้คุณเช็กอินกับตัวเอง",
+      loadingMoodDescription: "หยุดเบา ๆ ก่อนเริ่มต้นอีกครั้ง",
+      loadingReleaseTitle: "กำลังพาเข้าสู่ห้องระบาย",
+      loadingReleaseDescription: "ค่อย ๆ พาคุณไปยังขั้นถัดไปอย่างอ่อนโยน",
+      loadingReflectionTitle: "กำลังปล่อยให้ห้องค่อย ๆ สงบลง",
+      loadingReflectionDescription: "ให้ความเข้มของอารมณ์ค่อย ๆ ลดลงก่อนทบทวน",
+      loadingSummaryTitle: "กำลังรวบรวมสิ่งที่เปลี่ยนไป",
+      loadingSummaryDescription: "ขออีกเพียงช่วงสั้น ๆ ก่อนสรุปจะปรากฏขึ้น",
     },
     stats: {
       progressTracking: "ติดตามความคืบหน้า",
