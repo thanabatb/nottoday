@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { track } from "@vercel/analytics";
 import { useEffect, useRef, useState } from "react";
 import { useAppState } from "@/components/app-state-provider";
 import { LocaleToggle } from "@/components/locale-toggle";
@@ -90,7 +91,14 @@ export function HomeView() {
           <p className="landing-subtitle">{copy.home.welcomeSubtitle}</p>
         </div>
 
-        <button className="start-button landing-start-button" onClick={() => setResetOpen(true)} type="button">
+        <button
+          className="start-button landing-start-button"
+          onClick={() => {
+            track("enter_room_clicked", { locale });
+            setResetOpen(true);
+          }}
+          type="button"
+        >
           {copy.home.enterRoom}
         </button>
       </section>

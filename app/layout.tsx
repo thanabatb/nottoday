@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { AppStateProvider } from "@/components/app-state-provider";
 import "./globals.css";
 
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="th">
       <body>
         <AppStateProvider>{children}</AppStateProvider>
+        <Analytics />
       </body>
     </html>
   );

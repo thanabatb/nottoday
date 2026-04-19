@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { track } from "@vercel/analytics";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ShieldPlus, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -223,6 +224,8 @@ export function ResetFlow({
   const stageDialogRef = useRef<HTMLDivElement | null>(null);
   const nameDialogRef = useRef<HTMLDivElement | null>(null);
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
+  const transitionTimeoutRef = useRef<number | null>(null);
+  const initialTransitionShownRef = useRef(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<FullSessionInput>(initialDraft);
   const [pillowBroken, setPillowBroken] = useState(false);
@@ -232,6 +235,7 @@ export function ResetFlow({
   const [namePromptOpen, setNamePromptOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [usesTouchInput, setUsesTouchInput] = useState(false);
+  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase | null>(null);
   const locale = appState.preferences.locale;
   const copy = getCopy(locale);
   const needOptions = getNeedOptions(locale);
@@ -265,6 +269,34 @@ export function ResetFlow({
         : stepIndex === 3
           ? "summary-dialog-description"
           : "release-dialog-description";
+  const transitionCopy =
+    transitionPhase === "mood"
+      ? { title: copy.reset.loadingMoodTitle, description: copy.reset.loadingMoodDescription }
+      : transitionPhase === "release"
+        ? { title: copy.reset.loadingReleaseTitle, description: copy.reset.loadingReleaseDescription }
+        : transitionPhase === "reflection"
+          ? { title: copy.reset.loadingReflectionTitle, description: copy.reset.loadingReflectionDescription }
+          : transitionPhase === "summary"
+            ? { title: copy.reset.loadingSummaryTitle, description: copy.reset.loadingSummaryDescription }
+            : null;
+
+  const beginSoftTransition = useCallback((phase: TransitionPhase, onComplete?: () => void) => {
+    if (typeof window === "undefined") {
+      onComplete?.();
+      return;
+    }
+
+    if (transitionTimeoutRef.current) {
+      window.clearTimeout(transitionTimeoutRef.current);
+    }
+
+    setTransitionPhase(phase);
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      onComplete?.();
+      setTransitionPhase(null);
+      transitionTimeoutRef.current = null;
+    }, 980);
+  }, []);
 
   const spawnSmashEffect = () => {
     const id = Date.now() + Math.floor(Math.random() * 10000);
@@ -297,6 +329,12 @@ export function ResetFlow({
   };
 
   const resetFlowState = useCallback(() => {
+    if (transitionTimeoutRef.current) {
+      window.clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+
+    initialTransitionShownRef.current = false;
     setStepIndex(0);
     setDraft(initialDraft);
     setPillowBroken(false);
@@ -305,12 +343,14 @@ export function ResetFlow({
     setCompletedSession(null);
     setNamePromptOpen(false);
     setNameDraft("");
+    setTransitionPhase(null);
   }, []);
 
   const closeAndReset = useCallback(() => {
+    track("reset_flow_closed", { step: stepIndex, locale });
     resetFlowState();
     onClose();
-  }, [onClose, resetFlowState]);
+  }, [locale, onClose, resetFlowState, stepIndex]);
   const handleSoundToggle = () => {
     updatePreferences({
       soundEnabled: !soundEnabled,
@@ -325,7 +365,9 @@ export function ResetFlow({
     setCompletedSession(session);
 
     if (displayName) {
-      setStepIndex(3);
+      beginSoftTransition("summary", () => {
+        setStepIndex(3);
+      });
       return;
     }
 
@@ -342,9 +384,25 @@ export function ResetFlow({
     updatePreferences({
       displayName: trimmedName,
     });
-    setNamePromptOpen(false);
-    setStepIndex(3);
+    beginSoftTransition("summary", () => {
+      setNamePromptOpen(false);
+      setStepIndex(3);
+    });
   };
+
+  useEffect(() => {
+    if (!open) {
+      initialTransitionShownRef.current = false;
+      return;
+    }
+
+    if (initialTransitionShownRef.current) {
+      return;
+    }
+
+    initialTransitionShownRef.current = true;
+    beginSoftTransition("mood");
+  }, [beginSoftTransition, open]);
 
   useEffect(() => {
     if (!open) {
@@ -353,6 +411,14 @@ export function ResetFlow({
 
     onSoundtrackChange(stepIndex >= 2 ? "ending" : "main");
   }, [onSoundtrackChange, open, stepIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutRef.current) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -528,11 +594,14 @@ export function ResetFlow({
                   <MoodPicker
                     locale={locale}
                     onSelect={(moodBefore) => {
+                      track("mood_selected", { locale, mood: moodBefore });
                       setDraft((current) => ({ ...current, moodBefore }));
                       setPillowBroken(false);
                       setSmashEffects([]);
                       setHitCount(0);
-                      setStepIndex(1);
+                      beginSoftTransition("release", () => {
+                        setStepIndex(1);
+                      });
                     }}
                     selected={draft.moodBefore}
                   />
@@ -695,7 +764,16 @@ export function ResetFlow({
                   <div className="mx-auto mt-auto w-full max-w-xs sm:absolute sm:bottom-0 sm:left-1/2 sm:w-auto sm:max-w-none sm:-translate-x-1/2">
                     <button
                       className="start-button start-button-soft w-full sm:w-auto"
-                      onClick={() => setStepIndex(2)}
+                      onClick={() => {
+                        track("release_finished", {
+                          locale,
+                          mood_before: draft.moodBefore,
+                          hits: hitCount,
+                        });
+                        beginSoftTransition("reflection", () => {
+                          setStepIndex(2);
+                        });
+                      }}
                       type="button"
                     >
                       {copy.reset.finishRelease}
@@ -813,6 +891,14 @@ export function ResetFlow({
                   <button
                     className="reflective-primary-button inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition hover:-translate-y-0.5"
                     onClick={() => {
+                      track("summary_requested", {
+                        locale,
+                        mood_before: draft.moodBefore,
+                        mood_after: draft.moodAfter,
+                        need: draft.needId,
+                        control: draft.controlId,
+                        hits: hitCount,
+                      });
                       const session = saveResetSession({
                         ...draft,
                         releaseHitCount: hitCount,
@@ -849,8 +935,10 @@ export function ResetFlow({
                         aria-label={copy.common.close}
                         className="flow-close absolute right-5 top-5"
                         onClick={() => {
-                          setNamePromptOpen(false);
-                          setStepIndex(3);
+                          beginSoftTransition("summary", () => {
+                            setNamePromptOpen(false);
+                            setStepIndex(3);
+                          });
                         }}
                         type="button"
                       >
@@ -878,8 +966,10 @@ export function ResetFlow({
                         <button
                           className="rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/72 transition hover:border-white/22 hover:bg-white/[0.08]"
                           onClick={() => {
-                            setNamePromptOpen(false);
-                            setStepIndex(3);
+                            beginSoftTransition("summary", () => {
+                              setNamePromptOpen(false);
+                              setStepIndex(3);
+                            });
                           }}
                           type="button"
                         >
@@ -987,7 +1077,13 @@ export function ResetFlow({
                   <Link
                     className="reflective-primary-button inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold text-[#2f1c0f] transition hover:-translate-y-0.5"
                     href="/stats"
-                    onClick={closeAndReset}
+                    onClick={() => {
+                      track("stats_view_opened", {
+                        locale,
+                        from: "summary",
+                      });
+                      closeAndReset();
+                    }}
                   >
                     {copy.reset.viewPattern}
                   </Link>
@@ -1004,6 +1100,35 @@ export function ResetFlow({
         </div>
       </motion.div>
       )}
+      <AnimatePresence>
+        {transitionPhase && transitionCopy ? (
+          <motion.div
+            key={transitionPhase}
+            animate={{ opacity: 1 }}
+            className="soft-transition-screen"
+            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }}
+          >
+            <motion.div
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              className="soft-transition-panel"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={transition}
+            >
+              <p className="soft-transition-kicker">{copy.reset.transitionKicker}</p>
+              <h3 className="soft-transition-title">{transitionCopy.title}</h3>
+              <p className="soft-transition-description">{transitionCopy.description}</p>
+              <div className="soft-transition-track" aria-hidden="true">
+                <motion.div
+                  animate={{ width: ["8%", "40%", "78%", "100%"] }}
+                  className="soft-transition-fill"
+                  transition={{ duration: 0.9, ease: "easeInOut", times: [0, 0.26, 0.7, 1] }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }
